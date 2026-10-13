@@ -1,0 +1,32 @@
+{
+  "app": {
+    "title": "Massage Chair Booking",
+    "subtitle": "Book your relaxation sessions",
+    "settings": "Settings",
+    "makeBooking": "Make a Booking",
+    "viewBookings": "View Bookings",
+    "users": "Users",
+    "signOut": "Sign Out"
+  },
+  "userList": {
+    "title": "User Management",
+    "searchPlaceholder": "Search users...",
+    "adminAccess": "Admin Access Required",
+    "adminAccessMessage": "You need administrator privileges to view the user list.",
+    "noUsers": "No users found matching your search.",
+    "joined": "Joined",
+    "bookings": "bookings",
+    "editUser": "Edit User",
+    "email": "Email",
+    "adminPrivileges": "Admin privileges",
+    "deleteConfirm": "Are you sure you want to delete user {{email}}? This action cannot be undone.",
+    "deleteSuccess": "User deleted successfully",
+    "deleteError": "Failed to delete user. Please try again.",
+    "updateSuccess": "User updated successfully",
+    "updateError": "Failed to update user. Please try again.",
+    "cancel": "Cancel",
+    "saveChanges": "Save Changes",
+    "deleteUser": "Delete user",
+    "fetchError": "Failed to fetch users"
+  }
+}

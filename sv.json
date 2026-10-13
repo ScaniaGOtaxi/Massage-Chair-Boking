@@ -1,0 +1,94 @@
+{
+  "app": {
+    "title": "Massagestolsbokning",
+    "subtitle": "Boka dina avkopplingssessioner",
+    "settings": "Inställningar",
+    "makeBooking": "Gör en bokning",
+    "viewBookings": "Visa bokningar",
+    "users": "Användare",
+    "signOut": "Logga ut"
+  },
+  "booking": {
+    "name": "Namn",
+    "email": "E-post",
+    "date": "Datum",
+    "sessions": "Antal sessioner",
+    "timeSlot": "Tidslucka",
+    "session_single": "{{count}} session ({{minutes}} minuter)",
+    "session_plural": "{{count}} sessioner ({{minutes}} minuter)",
+    "noSlots": "Inga tillgängliga tider för valt datum och längd",
+    "selectedTime": "Vald tid: {{start}} - {{end}}",
+    "duration": "Längd: {{minutes}} minuter",
+    "bookButton": "Boka sessioner",
+    "bookingButton": "Bokar...",
+    "success": "Bokning lyckades!\nTid: {{start}} - {{end}}\nLängd: {{minutes}} minuter"
+  },
+  "validation": {
+    "nameRequired": "Namn krävs",
+    "invalidEmail": "Ogiltig e-postadress",
+    "pastDate": "Kan inte boka datum i det förflutna",
+    "maxSessions": "Maximalt 3 sessioner (45 minuter) tillåtna",
+    "unavailableSlot": "Denna tid är inte längre tillgänglig",
+    "slotTaken": "Denna tid har precis bokats av någon annan. Vänligen välj en annan tid",
+    "loginRequired": "Du måste vara inloggad för att boka en session",
+    "pastTime": "Kan inte boka en tid i det förflutna"
+  },
+  "auth": {
+    "createAccount": "Skapa konto",
+    "signIn": "Logga in",
+    "password": "Lösenord",
+    "passwordRequirements": "Lösenordet måste vara minst 6 tecken långt och innehålla versaler, gemener och siffror",
+    "alreadyHaveAccount": "Har du redan ett konto? Logga in",
+    "dontHaveAccount": "Har du inget konto? Registrera dig",
+    "processing": "Bearbetar..."
+  },
+  "userList": {
+    "title": "Användarhantering",
+    "searchPlaceholder": "Sök användare...",
+    "adminAccess": "Administratörsåtkomst krävs",
+    "adminAccessMessage": "Du behöver administratörsbehörighet för att visa användarlistan.",
+    "noUsers": "Inga användare hittades som matchar din sökning.",
+    "joined": "Gick med",
+    "bookings": "bokningar",
+    "editUser": "Redigera användare",
+    "email": "E-post",
+    "adminPrivileges": "Administratörsbehörighet",
+    "deleteConfirm": "Är du säker på att du vill ta bort användaren {{email}}? Denna åtgärd kan inte ångras.",
+    "deleteSuccess": "Användaren har tagits bort",
+    "deleteError": "Det gick inte att ta bort användaren. Försök igen.",
+    "updateSuccess": "Användaren har uppdaterats",
+    "updateError": "Det gick inte att uppdatera användaren. Försök igen.",
+    "cancel": "Avbryt",
+    "saveChanges": "Spara ändringar"
+  },
+  "bookingsList": {
+    "title": "Alla bokningar",
+    "adminMode": "Administratörsläge",
+    "noBookings": "Inga bokningar hittades",
+    "editBooking": "Redigera bokning",
+    "cancelBooking": "Avbryt",
+    "deleteConfirm": "Är du säker på att du vill avbryta denna bokning?",
+    "deleteSuccess": "Bokningen har avbrutits",
+    "deleteError": "Det gick inte att avbryta bokningen. Försök igen.",
+    "updateSuccess": "Bokningen har uppdaterats",
+    "updateError": "Det gick inte att uppdatera bokningen. Försök igen."
+  },
+  "userSettings": {
+    "title": "Användarinställningar",
+    "accountInfo": "Kontoinformation",
+    "personalDetails": "Dina personliga kontouppgifter",
+    "memberSince": "Medlem sedan",
+    "activitySummary": "Aktivitetssammanfattning",
+    "totalBookings": "Totalt antal bokningar",
+    "removePhoto": "Ta bort foto",
+    "uploadPhoto": "Ladda upp foto",
+    "credits": "Skapad av Piotr Zdeb QFSV 2025"
+  },
+  "language": {
+    "select": "Välj språk",
+    "en": "Engelska",
+    "sv": "Svenska",
+    "pl": "Polska",
+    "es": "Spanska"
+  }
+}

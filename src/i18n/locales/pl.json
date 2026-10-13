@@ -1,0 +1,94 @@
+{
+  "app": {
+    "title": "Rezerwacja Fotela Masującego",
+    "subtitle": "Zarezerwuj sesje relaksacyjne",
+    "settings": "Ustawienia",
+    "makeBooking": "Nowa rezerwacja",
+    "viewBookings": "Zobacz rezerwacje",
+    "users": "Użytkownicy",
+    "signOut": "Wyloguj się"
+  },
+  "booking": {
+    "name": "Imię",
+    "email": "Email",
+    "date": "Data",
+    "sessions": "Liczba sesji",
+    "timeSlot": "Termin",
+    "session_single": "{{count}} sesja ({{minutes}} minut)",
+    "session_plural": "{{count}} sesje ({{minutes}} minut)",
+    "noSlots": "Brak dostępnych terminów dla wybranej daty i długości",
+    "selectedTime": "Wybrany termin: {{start}} - {{end}}",
+    "duration": "Czas trwania: {{minutes}} minut",
+    "bookButton": "Zarezerwuj sesje",
+    "bookingButton": "Rezerwuję...",
+    "success": "Rezerwacja udana!\nTermin: {{start}} - {{end}}\nCzas trwania: {{minutes}} minut"
+  },
+  "validation": {
+    "nameRequired": "Imię jest wymagane",
+    "invalidEmail": "Nieprawidłowy adres email",
+    "pastDate": "Nie można zarezerwować terminu w przeszłości",
+    "maxSessions": "Maksymalnie 3 sesje (45 minut)",
+    "unavailableSlot": "Ten termin nie jest już dostępny",
+    "slotTaken": "Ten termin został właśnie zarezerwowany przez kogoś innego. Wybierz inny termin",
+    "loginRequired": "Musisz być zalogowany, aby dokonać rezerwacji",
+    "pastTime": "Nie można zarezerwować terminu w przeszłości"
+  },
+  "auth": {
+    "createAccount": "Utwórz konto",
+    "signIn": "Zaloguj się",
+    "password": "Hasło",
+    "passwordRequirements": "Hasło musi mieć co najmniej 6 znaków i zawierać wielkie litery, małe litery i cyfry",
+    "alreadyHaveAccount": "Masz już konto? Zaloguj się",
+    "dontHaveAccount": "Nie masz konta? Zarejestruj się",
+    "processing": "Przetwarzanie..."
+  },
+  "userList": {
+    "title": "Zarządzanie użytkownikami",
+    "searchPlaceholder": "Szukaj użytkowników...",
+    "adminAccess": "Wymagany dostęp administratora",
+    "adminAccessMessage": "Potrzebujesz uprawnień administratora, aby wyświetlić listę użytkowników.",
+    "noUsers": "Nie znaleziono użytkowników pasujących do wyszukiwania.",
+    "joined": "Dołączył",
+    "bookings": "rezerwacji",
+    "editUser": "Edytuj użytkownika",
+    "email": "Email",
+    "adminPrivileges": "Uprawnienia administratora",
+    "deleteConfirm": "Czy na pewno chcesz usunąć użytkownika {{email}}? Tej operacji nie można cofnąć.",
+    "deleteSuccess": "Użytkownik został usunięty",
+    "deleteError": "Nie udało się usunąć użytkownika. Spróbuj ponownie.",
+    "updateSuccess": "Użytkownik został zaktualizowany",
+    "updateError": "Nie udało się zaktualizować użytkownika. Spróbuj ponownie.",
+    "cancel": "Anuluj",
+    "saveChanges": "Zapisz zmiany"
+  },
+  "bookingsList": {
+    "title": "Wszystkie rezerwacje",
+    "adminMode": "Tryb administratora",
+    "noBookings": "Nie znaleziono rezerwacji",
+    "editBooking": "Edytuj rezerwację",
+    "cancelBooking": "Anuluj",
+    "deleteConfirm": "Czy na pewno chcesz anulować tę rezerwację?",
+    "deleteSuccess": "Rezerwacja została anulowana",
+    "deleteError": "Nie udało się anulować rezerwacji. Spróbuj ponownie.",
+    "updateSuccess": "Rezerwacja została zaktualizowana",
+    "updateError": "Nie udało się zaktualizować rezerwacji. Spróbuj ponownie."
+  },
+  "userSettings": {
+    "title": "Ustawienia użytkownika",
+    "accountInfo": "Informacje o koncie",
+    "personalDetails": "Twoje dane osobiste",
+    "memberSince": "Użytkownik od",
+    "activitySummary": "Podsumowanie aktywności",
+    "totalBookings": "Łączna liczba rezerwacji",
+    "removePhoto": "Usuń zdjęcie",
+    "uploadPhoto": "Dodaj zdjęcie",
+    "credits": "Stworzone przez Piotr Zdeb QFSV 2025"
+  },
+  "language": {
+    "select": "Wybierz język",
+    "en": "Angielski",
+    "sv": "Szwedzki",
+    "pl": "Polski",
+    "es": "Hiszpański"
+  }
+}

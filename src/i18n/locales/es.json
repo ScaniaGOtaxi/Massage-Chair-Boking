@@ -1,0 +1,94 @@
+{
+  "app": {
+    "title": "Reserva de Sillón de Masaje",
+    "subtitle": "Reserva tus sesiones de relajación",
+    "settings": "Ajustes",
+    "makeBooking": "Hacer una reserva",
+    "viewBookings": "Ver reservas",
+    "users": "Usuarios",
+    "signOut": "Cerrar sesión"
+  },
+  "booking": {
+    "name": "Nombre",
+    "email": "Correo electrónico",
+    "date": "Fecha",
+    "sessions": "Número de sesiones",
+    "timeSlot": "Horario",
+    "session_single": "{{count}} sesión ({{minutes}} minutos)",
+    "session_plural": "{{count}} sesiones ({{minutes}} minutos)",
+    "noSlots": "No hay horarios disponibles para la fecha y duración seleccionadas",
+    "selectedTime": "Horario seleccionado: {{start}} - {{end}}",
+    "duration": "Duración: {{minutes}} minutos",
+    "bookButton": "Reservar sesiones",
+    "bookingButton": "Reservando...",
+    "success": "¡Reserva exitosa!\nHorario: {{start}} - {{end}}\nDuración: {{minutes}} minutos"
+  },
+  "validation": {
+    "nameRequired": "El nombre es requerido",
+    "invalidEmail": "Correo electrónico inválido",
+    "pastDate": "No se pueden hacer reservas en fechas pasadas",
+    "maxSessions": "Máximo 3 sesiones (45 minutos) permitidas",
+    "unavailableSlot": "Este horario ya no está disponible",
+    "slotTaken": "Este horario acaba de ser reservado por alguien más. Por favor elige otro horario",
+    "loginRequired": "Debes iniciar sesión para hacer una reserva",
+    "pastTime": "No se puede reservar un horario en el pasado"
+  },
+  "auth": {
+    "createAccount": "Crear cuenta",
+    "signIn": "Iniciar sesión",
+    "password": "Contraseña",
+    "passwordRequirements": "La contraseña debe tener al menos 6 caracteres y contener mayúsculas, minúsculas y números",
+    "alreadyHaveAccount": "¿Ya tienes una cuenta? Inicia sesión",
+    "dontHaveAccount": "¿No tienes una cuenta? Regístrate",
+    "processing": "Procesando..."
+  },
+  "userList": {
+    "title": "Gestión de usuarios",
+    "searchPlaceholder": "Buscar usuarios...",
+    "adminAccess": "Acceso de administrador requerido",
+    "adminAccessMessage": "Necesitas privilegios de administrador para ver la lista de usuarios.",
+    "noUsers": "No se encontraron usuarios que coincidan con tu búsqueda.",
+    "joined": "Se unió",
+    "bookings": "reservas",
+    "editUser": "Editar usuario",
+    "email": "Correo electrónico",
+    "adminPrivileges": "Privilegios de administrador",
+    "deleteConfirm": "¿Estás seguro de que quieres eliminar al usuario {{email}}? Esta acción no se puede deshacer.",
+    "deleteSuccess": "Usuario eliminado exitosamente",
+    "deleteError": "Error al eliminar usuario. Por favor intenta de nuevo.",
+    "updateSuccess": "Usuario actualizado exitosamente",
+    "updateError": "Error al actualizar usuario. Por favor intenta de nuevo.",
+    "cancel": "Cancelar",
+    "saveChanges": "Guardar cambios"
+  },
+  "bookingsList": {
+    "title": "Todas las reservas",
+    "adminMode": "Modo administrador",
+    "noBookings": "No se encontraron reservas",
+    "editBooking": "Editar reserva",
+    "cancelBooking": "Cancelar",
+    "deleteConfirm": "¿Estás seguro de que quieres cancelar esta reserva?",
+    "deleteSuccess": "Reserva cancelada exitosamente",
+    "deleteError": "Error al cancelar la reserva. Por favor intenta de nuevo.",
+    "updateSuccess": "Reserva actualizada exitosamente",
+    "updateError": "Error al actualizar la reserva. Por favor intenta de nuevo."
+  },
+  "userSettings": {
+    "title": "Configuración de usuario",
+    "accountInfo": "Información de la cuenta",
+    "personalDetails": "Tus datos personales",
+    "memberSince": "Miembro desde",
+    "activitySummary": "Resumen de actividad",
+    "totalBookings": "Total de reservas realizadas",
+    "removePhoto": "Eliminar foto",
+    "uploadPhoto": "Subir foto",
+    "credits": "Creado por Piotr Zdeb QFSV 2025"
+  },
+  "language": {
+    "select": "Seleccionar idioma",
+    "en": "Inglés",
+    "sv": "Sueco",
+    "pl": "Polaco",
+    "es": "Español"
+  }
+}
