@@ -1,0 +1,68 @@
+name: Statistik endast vardagar
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: adfbca91b87ba69068a5d6119896714c228d70ae
+      - name: Ändra till måndag-fredag
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          out=Path('deployment/onecom/MassageBoking');assets=out/'assets'
+          p=next(assets.glob('qfsv-statistics-all-v1*.js'));s=p.read_text()
+          old='rows.push(...data);';assert s.count(old)==1
+          s=s.replace(old,"rows.push(...data.filter(r=>{const day=new Date(r.date+'T12:00:00Z').getUTCDay();return day>=1&&day<=5}));")
+          p.write_text(s)
+          p=next(assets.glob('qfsv-analytics*.js'));s=p.read_text()
+          assert s.count('settings.days||[0,1,2,3,4,5,6]')==1
+          s=s.replace('settings.days||[0,1,2,3,4,5,6]','settings.days||[1,2,3,4,5]')
+          s=s.replace("r.date<=today)","r.date<=today&&![0,6].includes(date(r.date).getUTCDay()))")
+          s=s.replace('valid,week,hours,','valid,week:week.slice(0,5),hours,')
+          p.write_text(s)
+          p=next(assets.glob('qfsv-panel*.js'));s=p.read_text()
+          assert s.count('days:[0,1,2,3,4,5,6]')==1
+          s=s.replace('days:[0,1,2,3,4,5,6]','days:[1,2,3,4,5]')
+          s=s.replace("['Sön','Mån','Tis','Ons','Tor','Fre','Lör'].map((label,i)=>", "[[1,'Mån'],[2,'Tis'],[3,'Ons'],[4,'Tor'],[5,'Fre']].map(([i,label])=>")
+          s=s.replace('En stol. Hela öppetdagen räknas även idag.', 'En stol. Måndag–fredag kl. 06–17 som standard. Helger är stängda och ingår inte. Hela öppetdagen räknas även idag.')
+          s=s.replace('sparade bokningar till och med idag','måndag–fredag · sparade bokningar till och med idag')
+          p.write_text(s)
+          files=list(out.rglob('*.js'));names={p.name:p.stem+'.weekday1.js' for p in files}
+          for p in out.rglob('*'):
+           if p.is_file() and p.suffix in ['.js','.html']:
+            s=p.read_text()
+            for old,new in names.items():s=s.replace(old,new)
+            p.write_text(s)
+          for p in files:p.rename(p.with_name(names[p.name]))
+          print('Statistik uppdaterad: måndag–fredag, helger stängt.')
+          PYBUILD
+      - name: Kontrollera och paketera
+        run: |
+          find deployment/onecom/MassageBoking -name '*.js' -exec node --check {} \;
+          python3 - <<'PYPACK'
+          from pathlib import Path
+          import zipfile
+          root=Path('deployment/onecom/MassageBoking')
+          with zipfile.ZipFile('qfsv-statistik-vardagar.zip','w',zipfile.ZIP_DEFLATED) as z:
+           for p in root.rglob('*'):
+            if p.is_file():z.write(p,'MassageBoking/'+str(p.relative_to(root)))
+           z.writestr('LAS-MIG.txt','Säkerhetskopiera först. Ladda upp hela MassageBoking inklusive assets till one.com. Behåll massage-splash.png och egna filer. Radera inte hela servermappen. Ctrl+F5. Admin > Statistik. Statistiken räknar endast måndag-fredag. Helger räknas inte i summeringar eller öppettid och visas inte i veckodagsgrafen. Ingen ny SQL behövs. Detta ändrar statistik, inte bokningsregler. Övriga funktioner behålls.')
+          PYPACK
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-statistik-vardagar
+          path: qfsv-statistik-vardagar.zip
+          if-no-files-found: error
+      - name: Spara i GitHub
+        run: |
+          git switch -c "onecom-statistik-vardagar-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/onecom/MassageBoking qfsv-statistik-vardagar.zip
+          git commit -m "Statistik endast mandag till fredag"
+          git push origin HEAD
