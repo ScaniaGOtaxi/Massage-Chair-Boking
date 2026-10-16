@@ -1,0 +1,115 @@
+name: Skapa komplett one.com-paket
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          ref: 5a8787ac4f898dc131d95a9d7a47c5dbd26cadab
+          path: .qfsv-base
+          persist-credentials: false
+
+      - name: Installera bildverktyg
+        run: python3 -m pip install cairosvg==2.8.2
+
+      - name: Bygg hela paketet
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          import re,base64,gzip,json,hashlib,shutil,runpy,sys,zipfile
+          import cairosvg
+
+          workflow=Path('.github/workflows/onecom-funktioner-v2.yml').read_text()
+          match=re.search(r'payload = """(.*?)"""',workflow,re.S)
+          if not match:
+              raise SystemExit('Den tidigare funktionsfilen saknas eller har ändrats.')
+
+          packed=base64.b64decode(match.group(1))
+          assert hashlib.sha256(packed).hexdigest()=='ebf58950b180275f3bd3d2501f563e4869cf12f66cf8e075462abc8d436b7e5b','Den packade funktionskoden är ändrad.'
+          files=json.loads(gzip.decompress(packed))
+          root=Path('/tmp/qfsv-komplett')
+
+          for name,text in files.items():
+              path=root/name
+              path.parent.mkdir(parents=True,exist_ok=True)
+              path.write_text(text)
+
+          svg = '''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+          <defs><linearGradient id="blue" x2=".8" y2="1"><stop stop-color="#60a5fa"/><stop offset="1" stop-color="#1d4ed8"/></linearGradient></defs>
+          <rect width="512" height="512" rx="110" fill="#eff6ff"/>
+          <ellipse cx="263" cy="435" rx="170" ry="20" fill="#dbeafe"/>
+          <path d="M131 125Q112 85 153 72L218 76Q251 81 257 119L279 244L366 273Q398 283 406 322L422 390Q423 414 396 422L185 423Q139 420 129 371L106 242Q100 213 124 204Z" fill="#172e55"/>
+          <path d="M147 111Q143 91 164 91L213 95Q232 97 238 124L259 239Q264 263 240 271L202 275Q182 274 178 252Z" fill="url(#blue)" stroke="#93c5fd" stroke-width="4"/>
+          <path d="M165 112Q161 100 174 100L205 103Q218 105 222 123L226 149L176 144Z" fill="#93c5fd"/>
+          <path d="M194 277Q187 264 208 260L266 256L352 285Q373 291 370 312L365 337L220 322Z" fill="url(#blue)" stroke="#93c5fd" stroke-width="4"/>
+          <path d="M330 322Q329 308 344 308L379 317Q392 321 397 340L411 392Q413 406 398 408L352 408Q340 407 339 393Z" fill="url(#blue)" stroke="#93c5fd" stroke-width="4"/>
+          <path d="M362 330L374 397" fill="none" stroke="#172e55" stroke-width="5" stroke-linecap="round"/>
+          <path d="M132 224Q153 210 169 229L216 292L290 306Q310 312 308 332L301 372Q298 394 275 394L194 378Q167 372 157 346L127 264Q118 236 132 224Z" fill="#244577" stroke="#365e93" stroke-width="4"/>
+          <path d="M139 237L181 303Q188 315 204 319L283 335" fill="none" stroke="#38bdf8" stroke-width="9" stroke-linecap="round"/>
+          <path d="M184 416L170 435M353 420L368 435" stroke="#172e55" stroke-width="12" stroke-linecap="round"/>
+          </svg>'''
+          cairosvg.svg2png(
+              bytestring=svg.encode(),
+              write_to=str(root/'src/massage-chair-v2.png')
+          )
+
+          app=root/'paket/MassageBoking'
+          source=Path('.qfsv-base/deployment/onecom/MassageBoking').resolve()
+          sys.argv=[str(root/'build.py'),str(source),str(app)]
+          runpy.run_path(str(root/'build.py'),run_name='__main__')
+
+          package=app.parent
+          shutil.copytree(root/'database',package/'Supabase')
+          shutil.copytree(root/'src',package/'Utveckling/src')
+          shutil.copyfile(root/'build.py',package/'Utveckling/build.py')
+          shutil.copyfile(root/'LAS-MIG.txt',package/'LAS-MIG.txt')
+
+          target=Path('deployment/onecom')
+          for name in ['MassageBoking','Supabase','Utveckling']:
+              dest=target/name
+              if dest.exists():
+                  shutil.rmtree(dest)
+              shutil.copytree(package/name,dest)
+
+          shutil.copyfile(
+              package/'LAS-MIG.txt',
+              target/'LAS-MIG-funktioner-v2.txt'
+          )
+
+          with zipfile.ZipFile(
+              'qfsv-onecom-komplett.zip','w',zipfile.ZIP_DEFLATED
+          ) as archive:
+              for path in package.rglob('*'):
+                  if path.is_file():
+                      archive.write(path,path.relative_to(package))
+
+          print('Komplett ZIP med app, stolikon, SQL och instruktioner skapad.')
+          PYBUILD
+
+      - name: Kontrollera JavaScript
+        run: |
+          find deployment/onecom/MassageBoking -name '*.js' -exec node --check {} \;
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-onecom-komplett
+          path: qfsv-onecom-komplett.zip
+          if-no-files-found: error
+
+      - name: Spara ZIP och filer i GitHub
+        run: |
+          git switch -c "onecom-komplett-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add qfsv-onecom-komplett.zip deployment/onecom
+          git commit -m "Komplett one.com-paket med funktioner och stolikon"
+          git push origin HEAD
