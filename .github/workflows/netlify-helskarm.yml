@@ -1,0 +1,232 @@
+name: Helskarm och valfri installation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 684a0feb3eb7ec0c8818389deead27990ae284a9
+
+      - name: Bygg helskarm och valfri installation
+        run: |
+          python3 - <<'PYBUILD'
+          INSTALL_JS=r'''(()=>{
+           const bar=document.getElementById('qfsv-install'),button=document.getElementById('qfsv-install-button'),status=document.getElementById('qfsv-install-status'),dialog=document.getElementById('qfsv-install-help'),instructions=document.getElementById('qfsv-install-instructions');
+           if(!bar||!button||!dialog)return;
+           const media=matchMedia('(display-mode: standalone)'),key='qfsv-install-dismissed-v1';
+           let pending=null,busy=false,installed=false,dismissed=false,opener=null;
+           try{dismissed=localStorage.getItem(key)==='yes'}catch{}
+           const standalone=()=>installed||media.matches||navigator.standalone===true;
+           const update=()=>{bar.hidden=dismissed||standalone();button.disabled=busy;document.body.classList.toggle('qfsv-is-installed',standalone())};
+           const dismiss=()=>{dismissed=true;try{localStorage.setItem(key,'yes')}catch{}update()};
+           const help=()=>{
+            const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+            instructions.textContent=ios?'På iPhone eller iPad: öppna sidan i Safari. Tryck på Dela och välj Lägg till på hemskärmen. Tryck Lägg till. Det är frivilligt att installera appen.':'I Chrome eller Edge: öppna menyn med tre punkter och välj Installera app eller Appar → Installera den här webbplatsen som en app. Det är frivilligt att installera appen. Du kan fortsätta använda den i webbläsaren.';
+            if(!dialog.open)dialog.showModal();
+           };
+           const install=async()=>{
+            if(busy||standalone())return;
+            opener=document.activeElement;
+            if(!pending){help();return}
+            const event=pending;pending=null;busy=true;update();
+            try{await event.prompt();const choice=await event.userChoice;if(choice.outcome==='dismissed')dismiss();else status.textContent='Följ webbläsarens anvisningar för att slutföra installationen.'}
+            catch{help()}
+            finally{busy=false;update()}
+           };
+           window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();pending=e;update()});
+           window.addEventListener('appinstalled',()=>{installed=true;pending=null;if(dialog.open)dialog.close();update()});
+           window.addEventListener('qfsv-install-request',install);
+           media.addEventListener('change',update);
+           button.addEventListener('click',install);
+           document.getElementById('qfsv-install-dismiss').addEventListener('click',dismiss);
+           document.getElementById('qfsv-install-close').addEventListener('click',()=>dialog.close());
+           dialog.addEventListener('close',()=>{if(opener?.isConnected)opener.focus()});
+           update();
+          })();
+          '''
+
+          from pathlib import Path
+          import zipfile
+
+          out=Path('deployment/netlify-app-v2')
+          p=out/'index.html'
+          s=p.read_text()
+          assert 'qfsv-install-dismiss' not in s
+          old='<button id="qfsv-install-button" type="button">'
+          assert s.count(old)==1
+          s=s.replace(old,'<button id="qfsv-install-dismiss" type="button" class="qfsv-install-dismiss">Nej tack</button>'+old)
+          s=s.replace('Öppna bokningen direkt från hemskärmen.','Du kan använda appen direkt i webbläsaren. Installation är frivillig.')
+          p.write_text(s,encoding='utf-8')
+
+          controller=next(out.glob('qfsv-install-v1*.js'))
+          controller.write_text(INSTALL_JS,encoding='utf-8')
+
+          for p in (out/'assets').glob('UserSettings-*.js'):
+           s=p.read_text()
+           marker='e.jsx(QFSV_LogoutButton,{})'
+           assert s.count(marker)==1
+           s=s.replace(marker,'e.jsxs("div",{className:"qfsv-settings-actions",children:[e.jsx("button",{type:"button",className:"qfsv-settings-install","data-qfsv-install-settings":"true",onClick:()=>window.dispatchEvent(new Event("qfsv-install-request")),children:"Installera appen"}),'+marker+']})')
+           p.write_text(s,encoding='utf-8')
+
+          p=out/'qfsv-install-v1.css'
+          s=p.read_text()+'''
+          #qfsv-install .qfsv-install-dismiss{background:white;color:#475569;border:1px solid #cbd5e1}
+          .qfsv-settings-actions{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+          .qfsv-settings-install{padding:9px 14px;color:#2563eb;border:1px solid #bfdbfe;border-radius:10px;background:white;font-size:14px}
+          .qfsv-is-installed .qfsv-settings-install{display:none}
+          @media(display-mode:standalone){.qfsv-settings-install{display:none}}
+          '''
+          p.write_text(s,encoding='utf-8')
+
+          files=list(out.rglob('*.js'))
+          names={p.name:p.stem+'.optional1.js' for p in files}
+          for p in out.rglob('*'):
+           if p.is_file() and p.suffix in ['.js','.html']:
+            s=p.read_text()
+            for old,new in names.items():s=s.replace(old,new)
+            p.write_text(s)
+          for p in files:p.rename(p.with_name(names[p.name]))
+
+          p=out/'index.html'
+          s=p.read_text().replace("register('/sw.optional1.js'","register('/sw.js'")
+          p.write_text(s)
+          (out/'sw.optional1.js').rename(out/'sw.js')
+
+          FULLSCREEN_JS=r'''export function FullscreenSettings({React:R}){
+           const h=R.createElement,root=document.documentElement;
+           const isFull=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
+           const supported=!!((root.requestFullscreen&&document.fullscreenEnabled!==false)||(root.webkitRequestFullscreen&&document.webkitFullscreenEnabled!==false));
+           const [active,setActive]=R.useState(isFull),[busy,setBusy]=R.useState(false),[error,setError]=R.useState('');
+           const pending=R.useRef(false),alive=R.useRef(true);
+
+           R.useEffect(()=>{
+            alive.current=true;
+            const update=()=>{setActive(isFull());setError('')};
+            document.addEventListener('fullscreenchange',update);
+            document.addEventListener('webkitfullscreenchange',update);
+            return()=>{
+             alive.current=false;
+             document.removeEventListener('fullscreenchange',update);
+             document.removeEventListener('webkitfullscreenchange',update);
+            };
+           },[]);
+
+           const toggle=async()=>{
+            if(pending.current||!supported)return;
+            pending.current=true;setBusy(true);setError('');
+            try{
+             if(isFull()){
+              const exit=document.exitFullscreen||document.webkitExitFullscreen;
+              if(!exit)throw new Error('unsupported');
+              await exit.call(document);
+             }else{
+              if(root.requestFullscreen)await root.requestFullscreen({navigationUI:'hide'});
+              else await root.webkitRequestFullscreen();
+             }
+             if(alive.current)setActive(isFull());
+            }catch{
+             if(alive.current)setError('Webbläsaren kunde inte ändra helskärmsläget. Prova igen eller använd webbläsarens helskärmsval.');
+            }finally{
+             pending.current=false;
+             if(alive.current)setBusy(false);
+            }
+           };
+
+           return h('section',{className:'qfsv-screen-card','aria-label':'Helskärmsinställningar'},
+            h('div',null,
+             h('h3',null,'Visning'),
+             h('p',null,supported
+              ?'Välj helskärm för mer plats. Du kan när som helst återgå till vanligt läge.'
+              :'Den här webbläsaren stöder inte helskärm för sidan. På iPhone kan du lägga till appen på hemskärmen via Safari för att öppna den utan vanliga webbläsarfält.')
+            ),
+            h('button',{
+             type:'button',
+             onClick:toggle,
+             disabled:busy||!supported,
+             'aria-pressed':active
+            },supported
+             ?(active?'Avsluta helskärm':'Aktivera helskärm')
+             :'Helskärm stöds inte'),
+            supported&&h('p',{className:'qfsv-screen-note'},active
+             ?'Helskärm är på. På dator kan du även trycka Esc för att lämna läget.'
+             :'Helskärm är frivilligt och kräver ingen installation.'),
+            error&&h('p',{role:'alert'},error)
+           );
+          }
+          '''
+
+          assets=out/'assets'
+          (assets/'qfsv-fullscreen-v1.js').write_text(FULLSCREEN_JS,encoding='utf-8')
+
+          for p in assets.glob('UserSettings-*.js'):
+           s=p.read_text()
+           marker='b&&e.jsxs("div",{className:"flex items-center gap-2 text-red-600 bg-red-50 p-4 rounded-md"'
+           assert s.count(marker)==1
+           s=s.replace(marker,'e.jsx(QFSV_Fullscreen,{React:o}),'+marker)
+           p.write_text('import{FullscreenSettings as QFSV_Fullscreen}from"./qfsv-fullscreen-v1.js";\n'+s,encoding='utf-8')
+
+          p=out/'qfsv-install-v1.css'
+          s=p.read_text()+'''
+          .qfsv-screen-card{background:white;border:1px solid #dbe5f3;border-radius:16px;padding:20px;color:#17304e;display:flex;align-items:center;flex-wrap:wrap;gap:14px;justify-content:space-between}
+          .qfsv-screen-card>div{flex:1;min-width:180px}
+          .qfsv-screen-card h3{font-size:18px;font-weight:600;margin:0 0 7px}
+          .qfsv-screen-card p{font-size:13px;line-height:1.7;color:#64748b}
+          .qfsv-screen-card button{border-radius:10px;background:#2563eb;color:white;padding:10px 16px;font-weight:600;font-size:14px}
+          .qfsv-screen-card button:disabled{opacity:.55;cursor:default}
+          .qfsv-screen-card button:focus-visible{outline:2px solid #2563eb;outline-offset:3px}
+          .qfsv-screen-card .qfsv-screen-note,.qfsv-screen-card p[role=alert]{flex-basis:100%}
+          .qfsv-screen-card p[role=alert]{color:#b91c1c}
+          :fullscreen{background:#f8fafc}
+          '''
+          p.write_text(s,encoding='utf-8')
+
+          files=list(out.rglob('*.js'))
+          names={p.name:p.stem+'.screen1.js' for p in files if p.name!='sw.js'}
+          for p in out.rglob('*'):
+           if p.is_file() and p.suffix in ['.js','.html']:
+            s=p.read_text()
+            for old,new in names.items():s=s.replace(old,new)
+            p.write_text(s)
+          for p in files:
+           if p.name in names:p.rename(p.with_name(names[p.name]))
+
+          with zipfile.ZipFile(
+           'qfsv-netlify-helskarm.zip','w',zipfile.ZIP_DEFLATED
+          ) as archive:
+           for p in out.rglob('*'):
+            if p.is_file():
+             archive.write(p,'netlify-app/'+str(p.relative_to(out)))
+           archive.writestr(
+            'LAS-MIG.txt',
+            'Ladda upp mappen netlify-app under Netlify > qfsv > Deploys. '
+            'Ctrl+F5. Inställningar > Visning > Aktivera helskärm. '
+            'Avsluta med knappen eller Esc på dator. '
+            'Nej tack stänger installationsrutan och sparar valet. '
+            'Ingen ändring i Supabase behövs.'
+           )
+          PYBUILD
+
+      - name: Kontrollera JavaScript
+        run: find deployment/netlify-app-v2 -name '*.js' -exec node --check {} \;
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-netlify-helskarm
+          path: qfsv-netlify-helskarm.zip
+          if-no-files-found: error
+
+      - name: Spara i GitHub
+        run: |
+          git switch -c "netlify-helskarm-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/netlify-app-v2 qfsv-netlify-helskarm.zip
+          git commit -m "Helskarm och valfri installation i installningar"
+          git push origin HEAD
