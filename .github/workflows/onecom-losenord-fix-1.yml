@@ -1,0 +1,334 @@
+name: Reparera losenordsaterstallning
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  losenord:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 652d467c71e5bf72376331ad900c3c482d0c6cfe
+
+      - name: Bygg aterstallningssidan
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil,re,json,base64,zipfile
+
+          source=Path('deployment/onecom/MassageBoking').resolve()
+          out=Path('/tmp/qfsv-password-build/MassageBoking').resolve()
+          if out.exists():
+              raise SystemExit('Output folder already exists')
+
+          html=(source/'index.html').read_text()
+          entries=re.findall(r'<script\b[^>]*type="module"[^>]*src="([^"]+)"',html)
+          if len(entries)!=1 or not entries[0].startswith('/MassageBoking/assets/'):
+              raise SystemExit('Unexpected app entry')
+
+          entry=entries[0].rsplit('/',1)[-1]
+          main=(source/'assets'/entry).read_text()
+          urls=set(re.findall(r'https://[a-z0-9-]+\.supabase\.co',main))
+          keys=set(re.findall(r'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+',main))
+          if len(urls)!=1 or len(keys)!=1:
+              raise SystemExit('Cannot identify public Supabase config')
+
+          key=next(iter(keys))
+          payload=json.loads(base64.urlsafe_b64decode(key.split('.')[1]+'==='))
+          if payload.get('role')!='anon':
+              raise SystemExit('Refusing to embed a non-public key')
+
+          vendors=list(source.glob('assets/supabase-*.js'))
+          if len(vendors)!=1 or 'Gr as c' not in vendors[0].read_text():
+              raise SystemExit('Unexpected SDK exports')
+
+          if main.count('e.jsx(CheckCircle,{size:16})')!=1:
+              raise SystemExit('Unexpected reset-email success markup')
+
+          shutil.copytree(source,out)
+          (out/'assets'/entry).write_text(
+              main.replace(
+                  'e.jsx(CheckCircle,{size:16})',
+                  'e.jsx("span",{"aria-hidden":true,children:"✓"})'
+              )
+          )
+
+          files={
+          'recovery-page.js': r'''import { createClient, AUTH_URL, PUBLIC_KEY } from './qfsv-auth-config-pw1.js';
+          import { recoveryLink, passwordError, updateError } from './qfsv-recovery-rules-pw1.js';
+
+          const root=document.getElementById('root');
+          const home='/MassageBoking/';
+          const link=recoveryLink(window.location.href);
+          let client;
+          const cleanUrl=()=>window.history.replaceState({},'',home+'reset-password');
+
+          function message(title,text){
+            root.innerHTML=`<main class="qfsv-reset"><h1></h1><p role="status"></p><a href="${home}">Till inloggningen</a></main>`;
+            root.querySelector('h1').textContent=title;
+            root.querySelector('p').textContent=text;
+          }
+
+          function expired(){
+            cleanUrl();
+            message(
+              'Länken kunde inte användas',
+              'Begär en ny återställningslänk via ”Forgot your password?”. Öppna länken i samma webbläsare som du använde när du begärde den.'
+            );
+          }
+
+          function showForm(){
+            root.innerHTML=`<main class="qfsv-reset">
+              <h1>Välj ett nytt lösenord</h1>
+              <form novalidate>
+                <label>Nytt lösenord<input id="new-password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
+                <label>Bekräfta lösenordet<input id="confirm-password" type="password" autocomplete="new-password" maxlength="128" required></label>
+                <p id="password-error" role="alert" aria-live="polite"></p>
+                <button type="submit">Spara nytt lösenord</button>
+              </form>
+              <p>Använd minst 8 tecken. Ett långt, unikt lösenord är bäst.</p>
+            </main>`;
+
+            const form=root.querySelector('form');
+            const button=form.querySelector('button');
+            const errorBox=document.getElementById('password-error');
+            let busy=false;
+
+            form.addEventListener('submit',async event=>{
+              event.preventDefault();
+              if(busy)return;
+
+              const password=document.getElementById('new-password').value;
+              const confirmation=document.getElementById('confirm-password').value;
+              const validation=passwordError(password,confirmation);
+              errorBox.textContent=validation;
+              if(validation)return;
+
+              busy=true;
+              button.disabled=true;
+              button.textContent='Sparar…';
+
+              try{
+                const {error}=await client.auth.updateUser({password});
+                if(error){
+                  const text=updateError(error);
+                  if(text==='expired'){expired();return;}
+                  errorBox.textContent=text;
+                  return;
+                }
+
+                message('Lösenordet är uppdaterat','Du kan nu logga in med ditt nya lösenord.');
+                const back=root.querySelector('a');
+                back.addEventListener('click',async event=>{
+                  event.preventDefault();
+                  try{
+                    const {error}=await client.auth.signOut({scope:'local'});
+                    if(error)throw error;
+                    window.location.assign(home);
+                  }catch{
+                    root.querySelector('p').textContent='Lösenordet är uppdaterat, men utloggningen misslyckades. Tryck på länken igen för att försöka på nytt.';
+                  }
+                });
+              }catch{
+                errorBox.textContent='Kunde inte spara lösenordet. Kontrollera anslutningen och försök igen.';
+              }finally{
+                busy=false;
+                button.disabled=false;
+                button.textContent='Spara nytt lösenord';
+              }
+            });
+          }
+
+          async function start(){
+            if(['invalid','missing'].includes(link.kind)){expired();return;}
+
+            if(link.kind==='pkce'){
+              try{
+                if(!localStorage.getItem('sb-auth-token-code-verifier')){
+                  expired();return;
+                }
+              }catch{expired();return;}
+            }
+
+            message('Kontrollerar länken…','Vänta medan återställningslänken kontrolleras.');
+
+            try{
+              client=createClient(AUTH_URL,PUBLIC_KEY,{auth:{
+                autoRefreshToken:true,
+                persistSession:true,
+                storageKey:'sb-auth-token',
+                flowType:link.kind==='implicit'?'implicit':'pkce',
+                detectSessionInUrl:true
+              }});
+
+              const {error:initError}=await client.auth.initialize();
+              if(initError){expired();return;}
+
+              if(link.kind==='token_hash'){
+                const {error}=await client.auth.verifyOtp({
+                  token_hash:link.token,type:'recovery'
+                });
+                if(error){expired();return;}
+              }
+
+              const {data:{session},error}=await client.auth.getSession();
+              if(error||!session){expired();return;}
+
+              const {data:{user},error:userError}=await client.auth.getUser();
+              if(userError||!user){expired();return;}
+
+              cleanUrl();
+              showForm();
+            }catch{expired();}
+          }
+
+          void start();
+          ''',
+
+          'recovery-rules.js': r'''export function recoveryLink(href){
+            const url=new URL(href);
+            const hash=new URLSearchParams(url.hash.slice(1));
+            if(url.searchParams.has('error')||url.searchParams.has('error_code')||hash.has('error')||hash.has('error_code')){
+              return {kind:'invalid'};
+            }
+            if(url.searchParams.get('type')==='recovery'&&url.searchParams.get('token_hash')){
+              return {kind:'token_hash',token:url.searchParams.get('token_hash')};
+            }
+            if(url.searchParams.get('code'))return {kind:'pkce'};
+            if(hash.get('type')==='recovery'&&hash.get('access_token')&&hash.get('refresh_token')){
+              return {kind:'implicit'};
+            }
+            return {kind:'missing'};
+          }
+
+          export function passwordError(password,confirmation){
+            if(password.length<8)return 'Använd minst 8 tecken.';
+            if(password.length>128)return 'Använd högst 128 tecken.';
+            if(password!==confirmation)return 'Lösenorden stämmer inte överens.';
+            return '';
+          }
+
+          export function updateError(error){
+            if(error?.name==='AuthSessionMissingError'||error?.status===401||error?.status===403||
+              ['session_not_found','refresh_token_not_found','otp_expired'].includes(error?.code)){
+              return 'expired';
+            }
+            if(error?.code==='same_password'){
+              return 'Välj ett lösenord som skiljer sig från det gamla.';
+            }
+            if(error?.code==='weak_password'){
+              return 'Lösenordet uppfyller inte säkerhetskraven. Välj ett starkare lösenord.';
+            }
+            return 'Kunde inte spara lösenordet. Kontrollera anslutningen och försök igen.';
+          }
+          ''',
+
+          'recovery.css': r'''.qfsv-reset{font-family:system-ui,sans-serif;max-width:440px;margin:8vh auto;padding:28px;background:white;border:1px solid #dbe3ed;border-radius:12px;color:#182435;box-sizing:border-box}
+          .qfsv-reset h1{font-size:25px;font-weight:650;margin:0 0 18px}
+          .qfsv-reset label{display:block;margin:18px 0;font-weight:500}
+          .qfsv-reset input{display:block;box-sizing:border-box;width:100%;margin-top:7px;padding:12px;border:1px solid #94a3b8;border-radius:6px;font-size:16px}
+          .qfsv-reset button{padding:12px 16px;border:0;border-radius:6px;background:#2563eb;color:white;font-size:16px;cursor:pointer}
+          .qfsv-reset button:disabled{opacity:.6;cursor:wait}
+          .qfsv-reset p{margin:16px 0;line-height:1.5}
+          .qfsv-reset a{color:#1d4ed8;text-decoration:underline}
+          .qfsv-reset [role=alert]{color:#b91c1c}
+          @media(max-width:520px){.qfsv-reset{margin:24px 12px;padding:22px}}
+          '''
+          }
+
+          for before,after in [
+              ('recovery-page.js','qfsv-recovery-pw1.js'),
+              ('recovery-rules.js','qfsv-recovery-rules-pw1.js'),
+              ('recovery.css','qfsv-recovery-pw1.css')
+          ]:
+              (out/after).write_text(files[before])
+
+          (out/'qfsv-auth-config-pw1.js').write_text(
+              'export {c as createClient} from "./assets/'+vendors[0].name+'";\n'
+              'export const AUTH_URL='+json.dumps(next(iter(urls)))+';\n'
+              'export const PUBLIC_KEY='+json.dumps(key)+';\n'
+          )
+
+          (out/'qfsv-router-pw1.js').write_text('''const path=window.location.pathname.replace(/\\/+$/, '');
+          const hash=new URLSearchParams(window.location.hash.slice(1));
+          const query=new URLSearchParams(window.location.search);
+          const recovery=path==='/MassageBoking/reset-password'||hash.get('type')==='recovery'||query.get('type')==='recovery';
+          try{
+            if(recovery){
+              const style=document.createElement('link');
+              style.rel='stylesheet';
+              style.href=new URL('./qfsv-recovery-pw1.css',import.meta.url).href;
+              document.head.append(style);
+              await import('./qfsv-recovery-pw1.js');
+            }else{
+              await import('./assets/ENTRY');
+            }
+          }catch{
+            document.getElementById('root').textContent='Kunde inte ladda sidan. Ladda om och försök igen.';
+          }
+          '''.replace('ENTRY',entry))
+
+          html=html.replace(
+              'src="'+entries[0]+'"',
+              'src="/MassageBoking/qfsv-router-pw1.js"'
+          )
+          html=html.replace(
+              '</head>',
+              '<meta name="referrer" content="no-referrer">\n</head>'
+          )
+          (out/'index.html').write_text(html)
+
+          with (out/'.htaccess').open('a') as f:
+              f.write('''\n<IfModule mod_headers.c>
+          <FilesMatch "^(index\\.html|qfsv-.*-pw1\\.(js|css))$">
+          Header set Cache-Control "no-store"
+          Header always set Referrer-Policy "no-referrer"
+          </FilesMatch>
+          </IfModule>
+          ''')
+
+          assets=out/'assets'
+          names={p.name:p.stem+'.pwfix1.js' for p in assets.glob('*.js')}
+          for p in [out/'index.html',*out.glob('qfsv-*.js'),*assets.glob('*.js')]:
+              text=p.read_text()
+              for before,after in names.items():
+                  text=text.replace(before,after)
+              p.write_text(text)
+
+          for before,after in names.items():
+              (assets/before).rename(assets/after)
+
+          shutil.copytree(out,source,dirs_exist_ok=True)
+          with zipfile.ZipFile('qfsv-losenord-fix-1.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for p in source.rglob('*'):
+                  if p.is_file():
+                      z.write(p,p.relative_to(source.parent))
+
+          print('Aterstallningssidan ar byggd. Inga konton har andrats.')
+          PY
+
+      - name: Kontrollera JavaScript
+        shell: bash
+        run: |
+          for file in deployment/onecom/MassageBoking/qfsv-*.js deployment/onecom/MassageBoking/assets/*.js; do
+            node --check "$file"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-losenord-fix-1
+          path: qfsv-losenord-fix-1.zip
+
+      - name: Spara pa separat gren
+        shell: bash
+        run: |
+          branch="onecom-password-fix-${GITHUB_RUN_ID}"
+          git switch -c "$branch"
+          git add -- deployment/onecom/MassageBoking
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Add password recovery page for one.com'
+          git push origin "$branch"
