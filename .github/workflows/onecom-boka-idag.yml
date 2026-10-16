@@ -1,0 +1,188 @@
+name: Bokning endast idag
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 25f1c293736b55d09a75ab0247fa9e5894903902
+
+      - name: Bygg app och databasregel
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          import shutil,zipfile
+
+          out=Path('deployment/onecom/MassageBoking')
+          assets=out/'assets'
+
+          helper=r'''
+          export const TIME_ZONE = 'Europe/Stockholm';
+          const OPEN = 360, CLOSE = 1020;
+          const dates = new Intl.DateTimeFormat('sv-SE', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+          const clock = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+          export const formatDate = date => dates.format(date);
+          export function validDate(value) {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+            const parsed = new Date(value + 'T00:00:00Z');
+            return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+          }
+          function minutes(time) {
+            if (typeof time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d(?::00(?:\.0+)?)?$/.test(time)) throw new Error('Invalid time format');
+            const [h, m] = time.split(':').map(Number);
+            return h * 60 + m;
+          }
+          const printTime = n => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+          function checkSessions(n) {
+            if (!Number.isInteger(n) || n < 1 || n > 2) throw new Error('Choose 1 or 2 sessions');
+          }
+          export function calculateEndTime(start, sessions) {
+            checkSessions(sessions);
+            const from = minutes(start), to = from + sessions * 20;
+            if (from < OPEN || (from - OPEN) % 20 !== 0 || to > CLOSE) throw new Error('Choose a 20-minute slot between 06:00 and 17:00');
+            return printTime(to);
+          }
+          export function validateBooking(date, start, sessions, now = new Date()) {
+            if (!validDate(date)) throw new Error('Choose a valid date');
+            const today = formatDate(now);
+            if (date !== today) throw new Error('Du kan bara boka tider för dagens datum.');
+            const end = calculateEndTime(start, sessions);
+            if (date < today || (date === today && minutes(start) <= minutes(clock.format(now)))) throw new Error('Cannot book a time in the past');
+            return end;
+          }
+          export async function generateTimeSlots(date, selectedTime = null, sessions = 1, bookings = [], now = new Date()) {
+            void selectedTime;
+            checkSessions(sessions);
+            if (!validDate(date)) return [];
+            const today = formatDate(now), current = minutes(clock.format(now));
+            if (date !== today) return [];
+            const intervals = bookings.filter(b => b.date === date).map(b => ({ start: minutes(b.start_time), end: minutes(b.end_time), name: b.name }));
+            return Array.from({ length: (CLOSE - OPEN) / 20 }, (_, i) => {
+              const from = OPEN + i * 20, to = from + sessions * 20;
+              const past = date < today || (date === today && from <= current);
+              const booked = intervals.find(b => from < b.end && to > b.start);
+              const reason = past ? (booked ? 'past_booked' : 'past_unbooked') : booked ? 'booked' : to > CLOSE ? 'invalid_duration' : undefined;
+              return { time: printTime(from), isAvailable: !reason, unavailableReason: reason, bookedBy: booked?.name,
+                tooltip: booked ? `This time slot is booked by ${booked.name || 'another user'}` : past ? 'This time has passed' : reason ? 'Booking must end by 17:00' : undefined };
+            });
+          }
+          '''
+
+          for p in assets.glob('qfsv-booking-times-v1*.js'):
+              p.write_text(helper.lstrip('\n'))
+
+          count=0
+          for p in assets.glob('BookingsAndStats-*.js'):
+              s=p.read_text()
+              old='QFSV_validDate(d)&&d>=W(new Date),"Cannot book dates in the past"'
+              assert s.count(old)==1
+              s=s.replace(old,'QFSV_validDate(d)&&d===W(new Date),"Du kan bara boka tider för dagens datum."')
+
+              old='type:"date",...C("date"),min:W(new Date),'
+              assert s.count(old)==1
+              s=s.replace(old,'type:"date",...C("date"),min:W(new Date),max:W(new Date),readOnly:!0,"aria-label":"Bokningsdatum – endast idag",')
+
+              old='defaultValue:m.date,'
+              assert s.count(old)==1
+              s=s.replace(old,'defaultValue:m.date,min:W(new Date),max:W(new Date),')
+
+              old='const update=async()=>{\n        try {'
+              assert s.count(old)==1
+              s=s.replace(old,'const update=async()=>{\n        if(o!==W(new Date)){S("date",W(new Date),{shouldValidate:true});l(null);S("timeSlot","");f([]);return;}\n        try {')
+
+              start=s.index('function Be(){')
+              end=s.index('function Ee(){',start)
+              form=s[start:end]
+              assert form.count('"Date"')==1
+              form=form.replace('"Date"','"Datum – bokning endast idag"')
+              s=s[:start]+form+s[end:]
+              p.write_text(s)
+              count+=1
+
+          assert count==2,'Förväntade bokningsmoduler saknas.'
+
+          files=list(out.rglob('*.js'))
+          mapping={p.name:p.stem+'.today1.js' for p in files}
+          for p in list(out.rglob('*')):
+              if p.is_file() and p.suffix in ('.js','.html'):
+                  s=p.read_text()
+                  for old,new in mapping.items():
+                      s=s.replace(old,new)
+                  p.write_text(s)
+          for p in files:
+              p.rename(p.with_name(mapping[p.name]))
+
+          sql=r'''
+          begin;
+          create or replace function public.qfsv_booking_today_only_v1()
+          returns trigger
+          language plpgsql
+          set search_path = ''
+          as $function$
+          begin
+            if tg_op = 'INSERT'
+               or new.date is distinct from old.date
+               or new.start_time is distinct from old.start_time
+               or new.end_time is distinct from old.end_time
+               or new.sessions is distinct from old.sessions then
+              if new.date is null
+                 or new.date::date <> (clock_timestamp() at time zone 'Europe/Stockholm')::date then
+                raise exception 'Du kan bara boka tider för dagens datum.' using errcode = '23514';
+              end if;
+            end if;
+            return new;
+          end;
+          $function$;
+
+          drop trigger if exists qfsv_booking_today_only_v1 on public.bookings;
+          create trigger qfsv_booking_today_only_v1
+          before insert or update of date, start_time, end_time, sessions
+          on public.bookings
+          for each row execute function public.qfsv_booking_today_only_v1();
+
+          revoke all on function public.qfsv_booking_today_only_v1() from public, anon, authenticated;
+          notify pgrst, 'reload schema';
+          commit;
+          '''
+
+          rollback='begin;\ndrop trigger if exists qfsv_booking_today_only_v1 on public.bookings;\ndrop function if exists public.qfsv_booking_today_only_v1();\ncommit;\n'
+
+          instructions='Säkerhetskopiera MassageBoking på one.com. Ladda upp hela paketets MassageBoking inklusive assets. Behåll massage-splash.png. Kör Supabase/01-boka-endast-idag.sql i rätt Supabase-projekts SQL Editor. Ladda om med Ctrl+F5. Befintliga bokningar raderas inte. Kör 02-filen endast om du vill ta bort databasregeln och återställ då även appens säkerhetskopia.'
+
+          db=Path('deployment/onecom/Supabase')
+          db.mkdir(parents=True,exist_ok=True)
+          (db/'01-boka-endast-idag.sql').write_text(sql.lstrip('\n'))
+          (db/'02-aterstall-datumregeln.sql').write_text(rollback)
+          Path('deployment/onecom/LAS-MIG-idag.txt').write_text(instructions)
+
+          with zipfile.ZipFile('qfsv-boka-idag.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for p in out.rglob('*'):
+                  if p.is_file():
+                      z.write(p,'MassageBoking/'+str(p.relative_to(out)))
+              z.write(db/'01-boka-endast-idag.sql','Supabase/01-boka-endast-idag.sql')
+              z.write(db/'02-aterstall-datumregeln.sql','Supabase/02-aterstall-datumregeln.sql')
+              z.writestr('LAS-MIG.txt',instructions)
+          PYBUILD
+
+      - name: Kontrollera JavaScript
+        run: |
+          find deployment/onecom/MassageBoking -name '*.js' -exec node --check {} \;
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-boka-idag
+          path: qfsv-boka-idag.zip
+          if-no-files-found: error
+
+      - name: Spara paketet i GitHub
+        run: |
+          git switch -c "onecom-boka-idag-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/onecom qfsv-boka-idag.zip
+          git commit -m "Tillåt bara dagens bokningar enligt svensk tid"
+          git push origin HEAD
