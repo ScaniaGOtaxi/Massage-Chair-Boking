@@ -1,0 +1,164 @@
+name: Hela appen pa Netlify v2
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 60cab29704322fa14d36c15096783530fc87ab43
+
+      - name: Anpassa appen till Netlify
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          import shutil
+          import json
+          import re
+          import urllib.request
+          import zipfile
+
+          source=Path('deployment/onecom/MassageBoking')
+          out=Path('deployment/netlify-app-v2')
+          assert not out.exists()
+          shutil.copytree(source,out)
+
+          for p in out.rglob('*'):
+           if p.is_file() and p.suffix in ['.js','.html','.css','.json']:
+            text=p.read_text(encoding='utf-8')
+            text=text.replace(
+             'https://www.zdeb.se/MassageBoking/',
+             'https://qfsv.netlify.app/'
+            ).replace(
+             'https://zdeb.se/MassageBoking/',
+             'https://qfsv.netlify.app/'
+            )
+            text=text.replace('/MassageBoking/','/').replace('/MassageBoking','')
+            p.write_text(text,encoding='utf-8')
+
+          index=out/'index.html'
+          text=index.read_text(encoding='utf-8')
+          text,count=re.subn(
+           r"navigator\.serviceWorker\.register\('[^']+'\)",
+           "navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'})",
+           text
+          )
+          assert count==1
+          index.write_text(text,encoding='utf-8')
+
+          (out/'sw.js').write_text('''
+          self.addEventListener('install',event=>{
+           event.waitUntil(self.skipWaiting());
+          });
+
+          self.addEventListener('activate',event=>{
+           event.waitUntil((async()=>{
+            const names=await caches.keys();
+            await Promise.all(
+             names.filter(name=>name.startsWith('massage-chair-booking-'))
+              .map(name=>caches.delete(name))
+            );
+
+            await self.clients.claim();
+
+            const windows=await self.clients.matchAll({
+             type:'window',
+             includeUncontrolled:true
+            });
+
+            for(const client of windows){
+             if(new URL(client.url).origin===self.location.origin)
+              client.navigate(client.url).catch(()=>{});
+            }
+           })());
+          });
+
+          self.addEventListener('fetch',event=>{
+           if(event.request.method==='GET' &&
+              new URL(event.request.url).origin===self.location.origin){
+            event.respondWith(fetch(event.request,{cache:'no-store'}));
+           }
+          });
+          ''',encoding='utf-8')
+
+          (out/'_redirects').write_text(
+           '/* /index.html 200\n',
+           encoding='utf-8'
+          )
+          (out/'_headers').write_text(
+           '/*\n  Cache-Control: no-store\n',
+           encoding='utf-8'
+          )
+          (out/'.htaccess').unlink(missing_ok=True)
+
+          manifest=json.loads(
+           (out/'manifest.json').read_text(encoding='utf-8')
+          )
+          assert manifest['start_url']=='/'
+          assert manifest['scope']=='/'
+
+          assert all(
+           'MassageBoking' not in p.read_text(encoding='utf-8')
+           for p in out.rglob('*')
+           if p.is_file() and p.suffix in ['.js','.html','.css','.json']
+          )
+
+          with urllib.request.urlopen(
+           'https://zdeb.se/MassageBoking/massage-splash.png',
+           timeout=30
+          ) as response:
+           image=response.read(8*1024*1024+1)
+
+          if not image or len(image)>8*1024*1024:
+           raise SystemExit('Kunde inte hämta startbilden.')
+
+          (out/'massage-splash.png').write_bytes(image)
+
+          instructions=(
+           'Komplett app för Netlify, version 2.0. '
+           'Packa upp ZIP och dra mappen netlify-app till '
+           'Netlify > qfsv > Deploys > manuell publicering. '
+           'Supabase: Authentication > URL Configuration. '
+           'Site URL: https://qfsv.netlify.app/ '
+           'Redirect URLs: https://qfsv.netlify.app/reset-password '
+           'och https://qfsv.netlify.app/. '
+           'Spara och testa med en ny återställningslänk. '
+           'Ingen ny SQL och ingen databasflytt behövs. '
+           'Startbild och ikoner ingår. '
+           'Ladda om med Ctrl+F5 och installera appen från Netlify-adressen.'
+          )
+
+          with zipfile.ZipFile(
+           'qfsv-netlify-app-v2.zip','w',zipfile.ZIP_DEFLATED
+          ) as archive:
+           for p in out.rglob('*'):
+            if p.is_file():
+             archive.write(p,'netlify-app/'+str(p.relative_to(out)))
+           archive.writestr('LAS-MIG.txt',instructions)
+
+          print('Hela appen version 2 är klar för Netlify.')
+          PYBUILD
+
+      - name: Kontrollera JavaScript
+        run: find deployment/netlify-app-v2 -name '*.js' -exec node --check {} \;
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-netlify-app-v2
+          path: qfsv-netlify-app-v2.zip
+          if-no-files-found: error
+
+      - name: Spara i GitHub
+        run: |
+          git switch -c "netlify-app-v2-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/netlify-app-v2 qfsv-netlify-app-v2.zip
+          git commit -m "Hela appen version 2 for Netlify"
+          git push origin HEAD
