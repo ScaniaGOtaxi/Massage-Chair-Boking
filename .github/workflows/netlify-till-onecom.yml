@@ -1,0 +1,158 @@
+name: Netlify till one.com
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skapa omdirigeringen
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          import zipfile
+
+          root=Path('deployment/netlify-hop-v2')
+          root.mkdir(parents=True,exist_ok=True)
+
+          (root/'index.html').write_text(r'''<!doctype html>
+          <html lang="sv">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <meta name="robots" content="noindex">
+          <title>Öppnar Massage Chair Booking</title>
+          <style>
+          body{margin:0;background:#f8fafc;color:#17304e;font:16px/1.6 system-ui,sans-serif;display:grid;min-height:100vh;place-items:center}
+          main{max-width:440px;margin:20px;padding:32px;background:white;border:1px solid #e5edf8;border-radius:20px;text-align:center}
+          h1{font-size:24px}
+          a{color:#2563eb;font-weight:600}
+          </style>
+          </head>
+          <body>
+          <main>
+            <h1>Massage Chair Booking</h1>
+            <p>Öppnar appen på den nya adressen…</p>
+            <a id="open-app" href="https://zdeb.se/MassageBoking/">Öppna appen</a>
+          </main>
+          <script>
+          (()=>{
+           const source=new URL(location.href);
+           const target=new URL('https://zdeb.se/MassageBoking/');
+           const path=source.pathname.replace(/^\/+/, '');
+           target.pathname+=path==='index.html'?'':path;
+           target.search=source.search;
+           target.hash=source.hash;
+           document.getElementById('open-app').href=target.href;
+           if('serviceWorker' in navigator)
+            navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'}).catch(()=>{});
+           location.replace(target.href);
+          })();
+          </script>
+          </body>
+          </html>
+          ''',encoding='utf-8')
+
+          (root/'sw.js').write_text(r'''
+          const TARGET='https://zdeb.se/MassageBoking/';
+
+          const destination=address=>{
+           const source=new URL(address);
+           const target=new URL(TARGET);
+           const path=source.pathname.replace(/^\/+/, '');
+           target.pathname+=path==='index.html'?'':path;
+           target.search=source.search;
+           target.hash=source.hash;
+           return target.href;
+          };
+
+          self.addEventListener('install',event=>{
+           event.waitUntil(self.skipWaiting());
+          });
+
+          self.addEventListener('activate',event=>{
+           event.waitUntil((async()=>{
+            const names=await caches.keys();
+            await Promise.all(
+             names.filter(name=>name.startsWith('massage-chair-booking-'))
+              .map(name=>caches.delete(name))
+            );
+            await self.clients.claim();
+            const windows=await self.clients.matchAll({
+             type:'window',
+             includeUncontrolled:true
+            });
+            for(const client of windows){
+             if(new URL(client.url).origin===self.location.origin)
+              client.navigate(client.url).catch(()=>{});
+            }
+           })());
+          });
+
+          self.addEventListener('fetch',event=>{
+           if(event.request.mode==='navigate' &&
+              new URL(event.request.url).origin===self.location.origin){
+            event.respondWith(
+             Response.redirect(destination(event.request.url),302)
+            );
+           }
+          });
+
+          self.addEventListener('notificationclick',event=>{
+           event.notification.close();
+           event.waitUntil(self.clients.openWindow(TARGET));
+          });
+          ''',encoding='utf-8')
+
+          (root/'_redirects').write_text(
+           '/ https://zdeb.se/MassageBoking/ 302!\n'
+           '/index.html https://zdeb.se/MassageBoking/ 302!\n'
+           '/* https://zdeb.se/MassageBoking/:splat 302\n',
+           encoding='utf-8'
+          )
+
+          (root/'_headers').write_text(
+           '/*\n  Cache-Control: no-store\n',
+           encoding='utf-8'
+          )
+
+          with zipfile.ZipFile(
+           'qfsv-netlify-hop.zip','w',zipfile.ZIP_DEFLATED
+          ) as archive:
+           for p in root.iterdir():
+            if p.is_file():
+             archive.write(p,'netlify-redirect/'+p.name)
+           archive.writestr(
+            'LAS-MIG.txt',
+            'Publicera endast på Netlify-projektet qfsv. '
+            'Packa upp ZIP och dra mappen netlify-redirect till '
+            'manuell publicering under Netlify > qfsv > Deploys. '
+            'Prova sedan https://qfsv.netlify.app/. '
+            'Filerna på one.com behöver inte ändras. '
+            'Installera den nya appen från one.com-adressen.'
+           )
+          PYBUILD
+
+      - name: Kontrollera service worker
+        run: node --check deployment/netlify-hop-v2/sw.js
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-netlify-hop
+          path: qfsv-netlify-hop.zip
+          if-no-files-found: error
+
+      - name: Spara i GitHub
+        run: |
+          git switch -c "netlify-hop-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/netlify-hop-v2 qfsv-netlify-hop.zip
+          git commit -m "Skicka Netlify till appen pa one.com"
+          git push origin HEAD
