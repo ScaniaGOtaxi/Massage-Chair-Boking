@@ -1,8 +1,11 @@
 name: Vit startvy - fyra sekunder
+
 on:
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   splash:
     runs-on: ubuntu-latest
@@ -10,16 +13,121 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: 5fece2a9bc752746f73bfc96b262161cb3678967
-      - name: Bygg startvyn
+
+      - name: Skapa filer för one.com
         run: |
           python3 - <<'PYBUILD'
           from pathlib import Path
-          import base64,gzip,json,hashlib,runpy,sys,shutil,zipfile
-          payload="""
-          H4sIAAAAAAACA6VY63LbxhV+lbVcDwAHAC+SHBc0ldipPZNJ3HqqNu3U9DhLYEGutQSQ3QUlVtZMH8btI+QF/CZ9kn57IQjRlJ2Z
-          6gcF7J495zv3s7g+mrdcFGmzOcrIUSnrFWmoXIVRphZfJMwewDFNwJTMsObEd6sIaePbyMvslESkJ1GwDU67bT4UyA3R/KYsdX
-          Ih9R97dxcqYCmpmbJFEmsR85wJ+9Wny1GGrw74doAydLSbIb6B4y6Ym4hxirduV2nFkb+pZGTpi1jj6Bj9JcN9gkSJVCG30
-          1OWpLk9ZY1lp57HHQ6caUWYIoImWKRRDs5rGR0MWvpyPBjSW+fpISaLGSh8MXHus5RrW1slPeBeUTz6BXNUtZTukgdxgWOxW
-          2tdtUGIPkHgSnw62KcdZmj+CkLrjmZ5kUwOO25KIJDIYn6tlvYM+SGMHo/kyg7HhhOYdQkZN+aKaD4ZaLQOQr1ACc7LxQ8NI
-          """
+          import re,zipfile
+
+          site=Path('deployment/onecom/MassageBoking')
+          html=(site/'index.html').read_text()
+
+          markup='<div id="qfsv-splash" role="region" aria-label="Appen startar"><div class="qfsv-intro"><img class="qfsv-intro-logo" src="/MassageBoking/massage-splash.png" width="160" height="160" alt="Massagestol"><h1>Massage Chair Booking</h1><p class="qfsv-intro-creator">Skapad av Piotr Zdeb</p><p class="qfsv-intro-version">ver. 2.0</p><div class="qfsv-intro-progress" role="progressbar" aria-label="Startförlopp" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="qfsv-intro-fill"></div></div><p class="qfsv-intro-percent" aria-hidden="true">0%</p><p class="qfsv-intro-status" role="status" aria-live="polite">Startar appen…</p></div></div>'
+
+          html,n=re.subn(r'<div id="qfsv-splash".*?(?=\s*<div id="root">)',markup+'\n    ',html,flags=re.S)
+          assert n==1,'Den tidigare startvyn saknas.'
+
+          html,n=re.subn(r'/MassageBoking/(?:qfsv-start-v2\.features2|qfsv-splash-v3)\.js','/MassageBoking/qfsv-splash-v4.js',html)
+          assert n==1,'Det tidigare startskriptet saknas.'
+
+          html=re.sub(r'<link rel="stylesheet" href="/MassageBoking/qfsv-splash-v3\.css">\s*','',html)
+          html=html.replace('</head>','<link rel="stylesheet" href="/MassageBoking/qfsv-splash-v4.css">\n</head>')
+
+          css=r'''#qfsv-splash{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;overflow:auto;padding:32px 24px;background:#ffffff;color:#17304e;text-align:center;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+          #qfsv-splash .qfsv-intro{width:min(100%,560px);padding:8px 0}
+          #qfsv-splash img.qfsv-intro-logo{display:block;width:160px;height:160px;object-fit:contain;margin:0 auto 32px;border-radius:28px;box-shadow:0 10px 32px #2563eb0d}
+          #qfsv-splash h1{font:800 clamp(26px,5vw,36px)/1.2 system-ui;letter-spacing:-.025em;color:#17304e;margin:0 0 14px}
+          #qfsv-splash p.qfsv-intro-creator{font:500 clamp(18px,3.5vw,22px)/1.45 system-ui;color:#2563eb;margin:0 0 16px}
+          #qfsv-splash p.qfsv-intro-version{font:500 22px/1.4 system-ui;color:#64748b;margin:0 0 36px}
+          #qfsv-splash .qfsv-intro-progress{height:14px;overflow:hidden;width:100%;border:1px solid #d8e4f3;border-radius:999px;background:#eaf1fb}
+          #qfsv-splash .qfsv-intro-fill{height:100%;width:100%;background:#2563eb;border-radius:999px;transform:scaleX(0);transform-origin:left;will-change:transform}
+          #qfsv-splash p.qfsv-intro-percent{font:800 18px/1.4 system-ui;font-variant-numeric:tabular-nums;color:#2563eb;margin:12px 0}
+          #qfsv-splash p.qfsv-intro-status{font:400 16px/1.5 system-ui;color:#64748b;margin:0}
+          #qfsv-splash button{margin-top:18px;padding:10px 20px;min-height:44px;border:0;border-radius:9px;background:#2563eb;color:#fff;font:600 15px system-ui;cursor:pointer}
+          #qfsv-splash button:focus-visible{outline:3px solid #2563eb;outline-offset:4px}
+          @media(max-width:420px){#qfsv-splash{padding:28px 22px}#qfsv-splash img.qfsv-intro-logo{width:144px;height:144px;margin-bottom:28px}#qfsv-splash p.qfsv-intro-version{margin-bottom:30px}}
+          '''
+
+          js=r'''
+          (() => {
+           const splash=document.getElementById('qfsv-splash'),root=document.getElementById('root');
+           if(!splash||!root)return;
+           const duration=4000,started=performance.now();
+           const bar=splash.querySelector('[role="progressbar"]'),fill=splash.querySelector('.qfsv-intro-fill');
+           const percent=splash.querySelector('.qfsv-intro-percent'),status=splash.querySelector('.qfsv-intro-status');
+           let appReady=false,finished=false,frame,gateTimer,slowTimer,lastPercent=-1;
+
+           const observer=new MutationObserver(()=>{
+            if(root.querySelector('.qfsv-reset')||root.textContent.startsWith('Kunde inte ladda sidan.'))close();
+           });
+
+           function close(){
+            if(finished)return;finished=true;
+            cancelAnimationFrame(frame);clearTimeout(gateTimer);clearTimeout(slowTimer);
+            observer.disconnect();window.removeEventListener('qfsv:ready',ready);splash.remove();
+           }
+
+           function paint(){
+            if(finished)return;
+            const elapsed=performance.now()-started;
+            const value=Math.min(100,Math.floor(elapsed/duration*100));
+            if(value!==lastPercent){
+             lastPercent=value;fill.style.transform=`scaleX(${value/100})`;
+             percent.textContent=value+'%';bar.setAttribute('aria-valuenow',String(value));
+            }
+            if(elapsed>=duration){
+             if(appReady)close();
+             else if(elapsed<15000)status.textContent='Startvyn är klar. Väntar på appen…';
+            }else frame=requestAnimationFrame(paint);
+           }
+
+           function ready(){
+            appReady=true;
+            if(performance.now()-started>=duration)paint();
+           }
+
+           window.addEventListener('qfsv:ready',ready);
+           observer.observe(root,{childList:true,subtree:true});
+           gateTimer=setTimeout(paint,duration);
+
+           slowTimer=setTimeout(()=>{
+            if(finished)return;
+            status.textContent='Det tar längre tid än väntat. Kontrollera anslutningen och ladda om sidan.';
+            const button=document.createElement('button');
+            button.type='button';button.textContent='Ladda om';
+            button.addEventListener('click',()=>window.location.reload());
+            status.after(button);
+           },15000);
+
+           paint();
+          })();
+          '''
+
+          (site/'index.html').write_text(html)
+          (site/'qfsv-splash-v4.css').write_text(css.lstrip('\n'))
+          (site/'qfsv-splash-v4.js').write_text(js.lstrip('\n'))
+
+          with zipfile.ZipFile('qfsv-splash-v4.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for name in ['index.html','qfsv-splash-v4.css','qfsv-splash-v4.js']:
+                  z.write(site/name,'MassageBoking/'+name)
+              z.writestr('LAS-MIG.txt','Säkerhetskopiera index.html på one.com. Ladda upp de tre filerna till befintliga MassageBoking. Behåll assets och massage-splash.png. Ladda om med Ctrl+F5. Ingen SQL behövs.')
           PYBUILD
+
+      - name: Kontrollera JavaScript
+        run: node --check deployment/onecom/MassageBoking/qfsv-splash-v4.js
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-splash-v4
+          path: qfsv-splash-v4.zip
+          if-no-files-found: error
+
+      - name: Spara i GitHub
+        run: |
+          git switch -c "onecom-splash-v4-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/onecom/MassageBoking qfsv-splash-v4.zip
+          git commit -m "Vit startvy med bild och fyra sekunders progressbar"
+          git push origin HEAD
