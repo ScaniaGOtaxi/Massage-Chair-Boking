@@ -1,0 +1,97 @@
+name: Statistik ALL
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: d7113c42a1885c163359eebea08921e8736d8109
+      - name: Bygg statistikpaketet
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          import base64,gzip,hashlib,runpy
+          payload="""
+          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
+          """
+          packed=base64.b64decode(payload)
+          assert hashlib.sha256(packed).hexdigest()=="66fc56eea3f895cefed1caef65fc5d7fd3c9e9c35b6cf4e1e3c3733f4847473c",'Koden kopierades inte fullständigt.'
+          code=gzip.decompress(packed).decode()
+          path=Path('deployment/onecom/statistik-all-source/build.py')
+          path.parent.mkdir(parents=True,exist_ok=True)
+          path.write_text(code)
+          runpy.run_path(str(path),run_name='__main__')
+          PYBUILD
+      - name: Kontrollera JavaScript
+        run: |
+          find deployment/onecom/MassageBoking -name '*.js' -exec node --check {} \;
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-statistik-alla-tider
+          path: qfsv-statistik-alla-tider.zip
+          if-no-files-found: error
+      - name: Spara i GitHub
+        run: |
+          git switch -c "onecom-statistik-allt-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/onecom qfsv-statistik-alla-tider.zip
+          git commit -m "Statistik ALL med flera år och bokade timmar"
+          git push origin HEAD
