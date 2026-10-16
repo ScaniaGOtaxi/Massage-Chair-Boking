@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Öppnar Massage Chair Booking</title>
+<style>
+body{margin:0;background:#f8fafc;color:#17304e;font:16px/1.6 system-ui,sans-serif;display:grid;min-height:100vh;place-items:center}
+main{max-width:440px;margin:20px;padding:32px;background:white;border:1px solid #e5edf8;border-radius:20px;text-align:center}
+h1{font-size:24px}
+a{color:#2563eb;font-weight:600}
+</style>
+</head>
+<body>
+<main>
+  <h1>Massage Chair Booking</h1>
+  <p>Öppnar appen på den nya adressen…</p>
+  <a id="open-app" href="https://zdeb.se/MassageBoking/">Öppna appen</a>
+</main>
+<script>
+(()=>{
+ const source=new URL(location.href);
+ const target=new URL('https://zdeb.se/MassageBoking/');
+ const path=source.pathname.replace(/^\/+/, '');
+ target.pathname+=path==='index.html'?'':path;
+ target.search=source.search;
+ target.hash=source.hash;
+ document.getElementById('open-app').href=target.href;
+ if('serviceWorker' in navigator)
+  navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'}).catch(()=>{});
+ location.replace(target.href);
+})();
+</script>
+</body>
+</html>
