@@ -1,0 +1,141 @@
+name: Skapa one.com-testpaket
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hamta och anpassa appen
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from urllib.request import urlopen
+          import re, json, zipfile
+
+          site = 'https://qfsv.netlify.app'
+          base = '/MassageBoking/'
+          root = Path('deployment/onecom/MassageBoking')
+          if root.exists():
+              raise SystemExit('Testmappen finns redan. Avbryter utan att skriva over.')
+          (root / 'assets').mkdir(parents=True)
+
+          def get(path):
+              with urlopen(site + path, timeout=30) as response:
+                  return response.read().decode('utf-8')
+
+          html = get('/')
+          pattern = r'(?:\./|/?assets/)([A-Za-z0-9_.-]+\.(?:js|css))'
+          pending = set(re.findall(pattern, html))
+          if not pending:
+              raise SystemExit('Hittar inga appfiler pa Netlify.')
+
+          seen = set()
+          while pending:
+              name = pending.pop()
+              if name in seen:
+                  continue
+              if len(seen) >= 100:
+                  raise SystemExit('For manga appfiler. Avbryter.')
+              seen.add(name)
+              text = get('/assets/' + name)
+              pending.update(set(re.findall(pattern, text)) - seen)
+              text = re.sub(
+                  r'([\w$]{1,16})=function\(([\w$]{1,16})\)\{return"/"\+\2\}',
+                  lambda m: m[1] + '=function(' + m[2] + '){return"' + base + '"+' + m[2] + '}',
+                  text)
+              text = text.replace(
+                  'window.location.assign("/auth")',
+                  'window.location.assign("' + base + 'auth")')
+              text = text.replace(
+                  '${window.location.origin}/reset-password',
+                  '${window.location.origin}' + base + 'reset-password')
+              text = text.replace(
+                  'emailRedirectTo:window.location.origin,',
+                  'emailRedirectTo:window.location.origin+"' + base + '",')
+              (root / 'assets' / name).write_text(text, encoding='utf-8')
+
+          html = re.sub(
+              r'<link\b[^>]*(?:splash/|apple-touch-icon|vite\.svg|icon-192|icon-512)[^>]*>',
+              '', html)
+          html = html.replace('"/assets/', '"' + base + 'assets/')
+          html = html.replace('"/manifest.json"', '"' + base + 'manifest.json"')
+          html = html.replace("'/sw.js'", "'" + base + "sw.js'")
+          html = html.replace('"/sw.js"', '"' + base + 'sw.js"')
+          html = html.replace(
+              '</head>',
+              '<link rel="icon" href="' + base + 'icon.svg"></head>')
+          (root / 'index.html').write_text(html, encoding='utf-8')
+
+          (root / 'icon.svg').write_text(
+              '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">'
+              '<rect width="192" height="192" rx="32" fill="#2563eb"/>'
+              '<text x="96" y="115" text-anchor="middle" font-size="52" '
+              'fill="white">QFSV</text></svg>')
+
+          manifest = {
+              'name': 'Massage Chair Booking',
+              'short_name': 'QFSV',
+              'id': base,
+              'start_url': base,
+              'scope': base,
+              'display': 'standalone',
+              'icons': [{
+                  'src': base + 'icon.svg',
+                  'sizes': 'any',
+                  'type': 'image/svg+xml'
+              }]
+          }
+          (root / 'manifest.json').write_text(json.dumps(manifest, indent=2))
+
+          (root / '.htaccess').write_text(
+              'DirectoryIndex index.html\n'
+              '<IfModule mod_rewrite.c>\n'
+              'RewriteEngine On\n'
+              'RewriteBase /MassageBoking/\n'
+              'RewriteRule ^(?:assets/|sw\\.js$|manifest\\.json$|icon\\.svg$) - [L]\n'
+              'RewriteCond %{REQUEST_FILENAME} !-f\n'
+              'RewriteCond %{REQUEST_FILENAME} !-d\n'
+              'RewriteRule . index.html [L]\n'
+              '</IfModule>\n')
+
+          (root / 'sw.js').write_text("""
+          self.addEventListener('install', e => e.waitUntil(self.skipWaiting()));
+          self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+          self.addEventListener('fetch', e => {
+            if (e.request.method !== 'GET') return;
+            const url = new URL(e.request.url);
+            if (url.origin !== self.location.origin ||
+                !url.pathname.startsWith('/MassageBoking/')) return;
+            e.respondWith(fetch(e.request, {cache: 'no-store'}));
+          });
+          """)
+
+          with zipfile.ZipFile('qfsv-onecom-test.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+              for p in root.rglob('*'):
+                  if p.is_file():
+                      z.write(p, p.relative_to(root.parent))
+          print('Skapade paket med', len(seen), 'appfiler.')
+          PY
+
+      - name: Spara nedladdningspaket
+        uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-onecom-test
+          path: qfsv-onecom-test.zip
+
+      - name: Lagg filerna pa en separat gren
+        shell: bash
+        run: |
+          branch="onecom-test-${GITHUB_RUN_ID}"
+          git switch -c "$branch"
+          git add -- deployment/onecom/MassageBoking
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Add one.com online hosting test'
+          git push origin "$branch"
