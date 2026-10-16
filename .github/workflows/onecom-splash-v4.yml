@@ -1,0 +1,25 @@
+name: Vit startvy - fyra sekunder
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  splash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 5fece2a9bc752746f73bfc96b262161cb3678967
+      - name: Bygg startvyn
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          import base64,gzip,json,hashlib,runpy,sys,shutil,zipfile
+          payload="""
+          H4sIAAAAAAACA6VY63LbxhV+lbVcDwAHAC+SHBc0ldipPZNJ3HqqNu3U9DhLYEGutQSQ3QUlVtZMH8btI+QF/CZ9kn57IQjRlJ2Z
+          6gcF7J495zv3s7g+mrdcFGmzOcrIUSnrFWmoXIVRphZfJMwewDFNwJTMsObEd6sIaePbyMvslESkJ1GwDU67bT4UyA3R/KYsdX
+          Ih9R97dxcqYCmpmbJFEmsR85wJ+9Wny1GGrw74doAydLSbIb6B4y6Ym4hxirduV2nFkb+pZGTpi1jj6Bj9JcN9gkSJVCG30
+          1OWpLk9ZY1lp57HHQ6caUWYIoImWKRRDs5rGR0MWvpyPBjSW+fpISaLGSh8MXHus5RrW1slPeBeUTz6BXNUtZTukgdxgWOxW
+          2tdtUGIPkHgSnw62KcdZmj+CkLrjmZ5kUwOO25KIJDIYn6tlvYM+SGMHo/kyg7HhhOYdQkZN+aKaD4ZaLQOQr1ACc7LxQ8NI
+          """
+          PYBUILD
