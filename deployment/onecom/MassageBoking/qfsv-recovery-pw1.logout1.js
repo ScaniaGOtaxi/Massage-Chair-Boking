@@ -1,5 +1,5 @@
-import { createClient, AUTH_URL, PUBLIC_KEY } from './qfsv-auth-config-pw1.js';
-import { recoveryLink, passwordError, updateError } from './qfsv-recovery-rules-pw1.js';
+import { createClient, AUTH_URL, PUBLIC_KEY } from './qfsv-auth-config-pw1.logout1.js';
+import { recoveryLink, passwordError, updateError } from './qfsv-recovery-rules-pw1.logout1.js';
 
 const root=document.getElementById('root');
 const home='/MassageBoking/';

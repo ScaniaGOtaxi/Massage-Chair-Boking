@@ -8,9 +8,9 @@ try{
     style.rel='stylesheet';
     style.href=new URL('./qfsv-recovery-pw1.css',import.meta.url).href;
     document.head.append(style);
-    await import('./qfsv-recovery-pw1.js');
+    await import('./qfsv-recovery-pw1.logout1.js');
   }else{
-    await import('./assets/index-D0UV-BkB.timefix1.pwfix1.js');
+    await import('./assets/index-D0UV-BkB.timefix1.pwfix1.logout1.js');
   }
 }catch{
   document.getElementById('root').textContent='Kunde inte ladda sidan. Ladda om och försök igen.';
