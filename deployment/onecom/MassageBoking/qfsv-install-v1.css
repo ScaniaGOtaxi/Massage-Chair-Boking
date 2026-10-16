@@ -1,0 +1,89 @@
+
+#qfsv-install {
+  box-sizing: border-box;
+  max-width: 1152px;
+  margin: 14px auto 0;
+  padding: 13px 18px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: #17304e;
+  font-family: inherit;
+}
+#qfsv-install[hidden] {
+  display: none !important;
+}
+#qfsv-install strong {
+  font-size: 14px;
+}
+#qfsv-install-status {
+  font-size: 12px;
+  color: #52647e;
+  margin: 3px 0 0;
+}
+#qfsv-install-button,
+#qfsv-install-close {
+  border: 0;
+  border-radius: 10px;
+  background: #2563eb;
+  color: white;
+  padding: 10px 15px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#qfsv-install-button:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+#qfsv-install-help {
+  box-sizing: border-box;
+  width: calc(100% - 32px);
+  max-width: 460px;
+  border: 1px solid #dbeafe;
+  border-radius: 20px;
+  padding: 26px;
+  color: #17304e;
+  background: white;
+  box-shadow: 0 20px 70px #17304e25;
+  font-family: inherit;
+}
+#qfsv-install-help::backdrop {
+  background: #17304e70;
+}
+#qfsv-install-help h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 14px;
+}
+#qfsv-install-instructions {
+  font-size: 15px;
+  line-height: 1.7;
+  margin: 0 0 22px;
+}
+#qfsv-install button:focus-visible,
+#qfsv-install-help button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 4px;
+}
+@media (max-width: 650px) {
+  #qfsv-install {
+    margin: 12px 14px 0;
+    padding: 12px;
+    flex-wrap: wrap;
+  }
+  #qfsv-install-button {
+    width: 100%;
+  }
+}
+@media (display-mode: standalone) {
+  #qfsv-install {
+    display: none !important;
+  }
+}
