@@ -1,0 +1,1 @@
+Säkerhetskopiera MassageBoking på one.com. Ladda upp hela paketets MassageBoking inklusive assets. Behåll massage-splash.png. Kör Supabase/01-boka-endast-idag.sql i rätt Supabase-projekts SQL Editor. Ladda om med Ctrl+F5. Befintliga bokningar raderas inte. Kör 02-filen endast om du vill ta bort databasregeln och återställ då även appens säkerhetskopia.
