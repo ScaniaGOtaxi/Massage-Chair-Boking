@@ -1,0 +1,18 @@
+#qfsv-splash{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;overflow:auto;padding:28px 20px;background:radial-gradient(ellipse at 15% 10%,#dcecff 0,transparent 52%),radial-gradient(ellipse at 95% 95%,#ddf8f5 0,transparent 44%),#f5f8fd;color:#17304e;text-align:center;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;transition:opacity .28s ease,visibility .28s ease}
+#qfsv-splash.qfsv-splash-closing{opacity:0;visibility:hidden;pointer-events:none}
+#qfsv-splash .qfsv-splash-card{width:min(100%,440px);padding:38px 28px 32px;border:1px solid #ffffff;border-radius:32px;background:#ffffffde;box-shadow:0 24px 70px #22508512,0 3px 12px #22508508;animation:qfsv-card-in .4s ease-out both}
+#qfsv-splash .qfsv-splash-brand{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.18em;color:#3b6191;margin:0 0 24px}
+#qfsv-splash .qfsv-splash-brand:before{content:"";width:7px;height:7px;border-radius:50%;background:#2b83e9;box-shadow:0 0 0 4px #e6f1ff}
+#qfsv-splash .qfsv-splash-art{position:relative;display:grid;place-items:center;width:218px;height:218px;margin:0 auto 25px;border-radius:38px;background:linear-gradient(145deg,#edf5ff,#ffffff);box-shadow:0 12px 35px #2161b511,inset 0 0 0 1px #e3edfa;transform:rotate(-3deg)}
+#qfsv-splash img{display:block;width:196px;height:196px;object-fit:contain;margin:0;border-radius:28px;transform:rotate(3deg)}
+#qfsv-splash h1{font-size:clamp(24px,6vw,31px);font-weight:750;line-height:1.2;letter-spacing:-.035em;margin:0 auto 12px;max-width:330px;color:#17304e}
+#qfsv-splash .qfsv-splash-subtitle{font-size:15px;line-height:1.6;color:#667b94;margin:0 0 30px}
+#qfsv-splash .qfsv-splash-progress{position:relative;overflow:hidden;width:116px;height:4px;border-radius:4px;background:#e6eef9;margin:0 auto 14px}
+#qfsv-splash .qfsv-splash-progress:after{content:"";display:block;width:48px;height:100%;border-radius:4px;background:linear-gradient(90deg,#60a5fa,#2563eb);animation:qfsv-progress 1.3s ease-in-out infinite}
+#qfsv-splash .qfsv-splash-status{font-size:13px;line-height:1.6;color:#637b98;margin:0}
+#qfsv-splash button{margin-top:14px;min-height:44px;padding:10px 18px;border:0;border-radius:12px;background:#2563eb;color:#fff;font:600 14px system-ui;cursor:pointer}
+#qfsv-splash button:focus-visible{outline:3px solid #2563eb;outline-offset:4px}
+@keyframes qfsv-progress{0%{transform:translateX(-48px)}100%{transform:translateX(116px)}}
+@keyframes qfsv-card-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:420px){#qfsv-splash .qfsv-splash-card{padding:30px 20px 26px;border-radius:26px}#qfsv-splash .qfsv-splash-art{width:184px;height:184px;border-radius:32px}#qfsv-splash img{width:168px;height:168px;border-radius:24px}}
+@media(prefers-reduced-motion:reduce){#qfsv-splash{transition:none}#qfsv-splash .qfsv-splash-card,#qfsv-splash .qfsv-splash-progress:after{animation:none}#qfsv-splash .qfsv-splash-progress:after{width:100%;opacity:.65}}
