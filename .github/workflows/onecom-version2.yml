@@ -1,0 +1,90 @@
+name: Uppdatera till version 2
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 7d8f75be0926a02eb338ba4f897072b563a69478
+
+      - name: Uppdatera versionstexten
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          import zipfile
+
+          root=Path('deployment/onecom/MassageBoking')
+          old='Created by Piotr Zdeb QFSV 2025 Version 1.4'
+          new='Created by Piotr Zdeb QFSV 2025 Version 2.0'
+          count=0
+
+          for p in root.rglob('*'):
+           if p.is_file() and p.suffix in ['.js','.html','.json']:
+            text=p.read_text(encoding='utf-8')
+            if old in text:
+             count+=text.count(old)
+             p.write_text(text.replace(old,new),encoding='utf-8')
+
+          assert count==2, f'Oväntat antal versionstexter: {count}'
+
+          files=list(root.rglob('*.js'))
+          names={p.name:p.stem+'.version2.js' for p in files}
+
+          for p in root.rglob('*'):
+           if p.is_file() and p.suffix in ['.js','.html']:
+            text=p.read_text(encoding='utf-8')
+            for oldname,newname in names.items():
+             text=text.replace(oldname,newname)
+            p.write_text(text,encoding='utf-8')
+
+          for p in files:
+           p.rename(p.with_name(names[p.name]))
+
+          assert not any(
+           old in p.read_text(encoding='utf-8')
+           for p in root.rglob('*')
+           if p.is_file() and p.suffix in ['.js','.html','.json']
+          )
+
+          with zipfile.ZipFile(
+           'qfsv-version-2.zip','w',zipfile.ZIP_DEFLATED
+          ) as archive:
+           for p in root.rglob('*'):
+            if p.is_file():
+             archive.write(p,'MassageBoking/'+str(p.relative_to(root)))
+           archive.writestr(
+            'LAS-MIG.txt',
+            'Säkerhetskopiera MassageBoking på one.com. '
+            'Ladda upp hela paketets MassageBoking inklusive assets. '
+            'Behåll massage-splash.png och andra egna filer. '
+            'Ctrl+F5. Versionsraden visar nu Version 2.0. '
+            'Ingen ny SQL behövs. Installation och vardagsstatistik behålls.'
+           )
+
+          print(f'{count} versionstexter uppdaterade till 2.0.')
+          PYBUILD
+
+      - name: Kontrollera JavaScript
+        run: find deployment/onecom/MassageBoking -name '*.js' -exec node --check {} \;
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-version-2
+          path: qfsv-version-2.zip
+          if-no-files-found: error
+
+      - name: Spara i GitHub
+        run: |
+          git switch -c "onecom-version2-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/onecom/MassageBoking qfsv-version-2.zip
+          git commit -m "Visa version 2.0 i appen"
+          git push origin HEAD
