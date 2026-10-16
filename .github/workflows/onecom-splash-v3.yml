@@ -1,0 +1,87 @@
+name: Snygg startvy v3
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  splash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cc2f7f3ab7b00eb828e2e075b74f6dd5fab95bc7
+      - name: Bygg startvyn
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          import base64,gzip,json,hashlib,runpy,sys,shutil,zipfile
+          payload="""
+          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
+          """
+          packed=base64.b64decode(payload)
+          assert hashlib.sha256(packed).hexdigest()=="41996230100dd8bca6d89fed8b3a90d12441fe11f4249abcd48e7f7eb176da43",'Koden kopierades inte fullständigt.'
+          files=json.loads(gzip.decompress(packed))
+          root=Path('/tmp/qfsv-splash-v3')
+          for name,text in files.items():
+              p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text)
+          source=Path('deployment/onecom/MassageBoking').resolve()
+          out=root/'site/MassageBoking'
+          sys.argv=[str(root/'build.py'),str(source),str(out)]
+          runpy.run_path(str(root/'build.py'),run_name='__main__')
+          names=['index.html','qfsv-splash-v3.css','qfsv-splash-v3.js']
+          for name in names:shutil.copyfile(out/name,source/name)
+          with zipfile.ZipFile('qfsv-splash-v3.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for name in names:z.write(out/name,'MassageBoking/'+name)
+              z.writestr('LAS-MIG.txt','Säkerhetskopiera index.html på one.com. Ladda sedan upp de tre filerna i MassageBoking till din befintliga MassageBoking-mapp och ersätt index.html. Behåll assets och alla andra filer. Ladda om appen med Ctrl+F5. Ingen SQL behövs. Startvyn visas medan appen laddar; vid snabb anslutning syns den kort. Återställ tidigare index.html för att återgå.')
+          for name,text in files.items():
+              p=Path('deployment/onecom/splash-v3-source')/name
+              p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text)
+          print('Tre filer för den nya startvyn är klara.')
+          PYBUILD
+      - name: Kontrollera JavaScript
+        run: node --check deployment/onecom/MassageBoking/qfsv-splash-v3.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-splash-v3
+          path: qfsv-splash-v3.zip
+          if-no-files-found: error
+      - name: Spara i GitHub
+        run: |
+          git switch -c "onecom-splash-v3-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/onecom qfsv-splash-v3.zip
+          git commit -m "Ny startvy med stolbild och laddningsanimation"
+          git push origin HEAD
