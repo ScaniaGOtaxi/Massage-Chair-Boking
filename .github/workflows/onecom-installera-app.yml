@@ -1,110 +1,366 @@
 name: Installera appen
+
 on:
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   paket:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
           ref: e7efdd1674ad64323a4cdb71f28a30530a2cfcee
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - name: Förbered bildverktyg
         run: python -m pip install 'Pillow>=11,<13'
+
       - name: Bygg installationen
         run: |
           python - <<'PYBUILD'
           from pathlib import Path
-          root=Path('deployment/onecom/install-source')
-          (root/'src').mkdir(parents=True,exist_ok=True)
-          (root/'src'/'install.js').write_text(r'''(()=>{
-           const bar=document.getElementById('qfsv-install'),button=document.getElementById('qfsv-install-button'),status=document.getElementById('qfsv-install-status'),dialog=document.getElementById('qfsv-install-help'),text=document.getElementById('qfsv-install-instructions');
-           if(!bar||!button||!dialog)return;
-           const media=window.matchMedia('(display-mode: standalone)');let pending=null,busy=false,installed=false;
-           const standalone=()=>installed||media.matches||navigator.standalone===true;
-           const update=()=>{bar.hidden=standalone();button.disabled=busy;};
-           const help=()=>{
-            const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-            text.textContent=ios?'På iPhone eller iPad: öppna denna sida i Safari. Tryck på Dela och välj Lägg till på hemskärmen. Aktivera Öppna som webbapp om valet visas och tryck Lägg till.':'I Chrome eller Edge: öppna webbläsarens meny (tre punkter) och leta efter Installera app eller Appar → Installera den här webbplatsen som en app. Du kan också använda installationsikonen i adressfältet. Om valet saknas, prova Chrome eller Edge och öppna sidan direkt där.';
-            dialog.showModal();
-           };
-           window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();pending=event;status.textContent='Installera för att öppna bokningen direkt från hemskärmen.';update();});
-           window.addEventListener('appinstalled',()=>{installed=true;pending=null;if(dialog.open)dialog.close();update();});
-           media.addEventListener('change',update);
-           button.addEventListener('click',async()=>{
-            if(busy||standalone())return;
-            if(!pending){help();return;}
-            const event=pending;pending=null;busy=true;status.textContent='Öppnar installationen…';update();
-            try{
-             await event.prompt();const choice=await event.userChoice;
-             status.textContent=choice.outcome==='accepted'?'Installationen har begärts. Följ webbläsarens anvisningar.':'Du kan installera appen senare när du vill.';
-            }catch{status.textContent='Öppna installationshjälpen och prova via webbläsarens meny.';help();}
-            finally{busy=false;update();}
-           });
-           document.getElementById('qfsv-install-close').addEventListener('click',()=>dialog.close());
-           dialog.addEventListener('close',()=>{if(!standalone())button.focus();});
-           update();
-          })();
-          ''')
-          (root/'src'/'install.css').write_text(r'''#qfsv-install{max-width:1152px;margin:14px auto 0;padding:13px 18px;background:#eff6ff;border:1px solid #dbeafe;border-radius:14px;display:flex;align-items:center;justify-content:space-between;gap:14px;color:#17304e;font-family:inherit}#qfsv-install[hidden]{display:none!important}#qfsv-install strong{font-size:14px}#qfsv-install-status{font-size:12px;color:#52647e;margin:3px 0 0}#qfsv-install-button,#qfsv-install-close{border:0;border-radius:10px;background:#2563eb;color:white;padding:10px 15px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}#qfsv-install-button:disabled{opacity:.65;cursor:wait}#qfsv-install-help{box-sizing:border-box;width:calc(100% - 32px);max-width:460px;border:1px solid #dbeafe;border-radius:20px;padding:26px;color:#17304e;background:white;box-shadow:0 20px 70px #17304e25;font-family:inherit}#qfsv-install-help::backdrop{background:#17304e70}#qfsv-install-help h2{font-size:22px;font-weight:700;margin:0 0 14px}#qfsv-install-instructions{font-size:15px;line-height:1.7;margin:0 0 22px}#qfsv-install button:focus-visible,#qfsv-install-help button:focus-visible{outline:2px solid #2563eb;outline-offset:4px}@media(max-width:650px){#qfsv-install{margin:12px 14px 0;padding:12px;flex-wrap:wrap}#qfsv-install-button{width:100%}}@media(display-mode:standalone){#qfsv-install{display:none!important}}
-          ''')
-          from pathlib import Path
-          import shutil,json
-          root=Path('deployment/onecom/install-source');out=Path('deployment/onecom/MassageBoking')
-          for ext in ['js','css']:shutil.copyfile(root/('src/install.'+ext),out/('qfsv-install-v1.'+ext))
-          p=out/'index.html';s=p.read_text();assert 'id="qfsv-install"' not in s
-          s=s.replace('</head>','<link rel="stylesheet" href="/MassageBoking/qfsv-install-v1.css">\n<link rel="apple-touch-icon" href="/MassageBoking/icon-192.png">\n<script defer src="/MassageBoking/qfsv-install-v1.js"></script>\n</head>')
-          s=s.replace('<div id="root"></div>','''<aside id="qfsv-install" aria-label="Installera appen" hidden><div><strong>Massage Chair Booking som app</strong><p id="qfsv-install-status" role="status">Öppna bokningen direkt från hemskärmen.</p></div><button id="qfsv-install-button" type="button">Installera appen</button></aside>
-          <dialog id="qfsv-install-help" aria-labelledby="qfsv-install-heading"><h2 id="qfsv-install-heading">Installera appen</h2><p id="qfsv-install-instructions"></p><button id="qfsv-install-close" type="button" autofocus>Stäng</button></dialog>
-          <div id="root"></div>''')
-          s=s.replace('href="/MassageBoking/massage-chair-v2.png"','href="/MassageBoking/icon-192.png"')
-          p.write_text(s)
-          p=out/'manifest.json';manifest=json.loads(p.read_text());manifest['background_color']='#ffffff';manifest['theme_color']='#ffffff'
-          manifest['description']='Boka din stund i massagestolen.'
-          manifest['icons']=[{'src':'/MassageBoking/icon-192.png','sizes':'192x192','type':'image/png','purpose':'any'},{'src':'/MassageBoking/icon-512.png','sizes':'512x512','type':'image/png','purpose':'any'}]
-          p.write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
-          print('Installationsknapp och webbläsarhjälp tillagda.')
-
-          from pathlib import Path
-          from PIL import Image
-          import urllib.request,io,os
-          out=Path('deployment/onecom/MassageBoking')
-          for size in [192,512]:
-           name=f'icon-{size}.png'
-           fixture=os.environ.get('QFSV_TEST_ICONS')
-           if fixture:
-            raw=(Path(fixture)/name).read_bytes()
-           else:
-            with urllib.request.urlopen('https://zdeb.se/MassageBoking/'+name,timeout=30) as response:raw=response.read(8*1024*1024+1)
-           if len(raw)>8*1024*1024:raise SystemExit('Ikonfilen är för stor: '+name)
-           with Image.open(io.BytesIO(raw)) as image:
-            if image.format!='PNG' or image.size!=(size,size):raise SystemExit(f'{name} behöver vara PNG i storleken {size} x {size}.')
-            image.verify()
-           (out/name).write_bytes(raw)
-          print('Båda originalikonerna hämtade och kontrollerade.')
-
+          import shutil
+          import json
+          import io
+          import urllib.request
           import zipfile
-          with zipfile.ZipFile('qfsv-installera-app.zip','w',zipfile.ZIP_DEFLATED) as z:
-           for p in out.rglob('*'):
-            if p.is_file():z.write(p,'MassageBoking/'+str(p.relative_to(out)))
-           z.writestr('LAS-MIG.txt','Säkerhetskopiera på one.com. Ladda upp hela MassageBoking med assets. Behåll massage-splash.png och egna filer. Paketet innehåller båda originalikonerna icon-192.png och icon-512.png från din webbplats. Ctrl+F5. Knappen Installera appen visas i webbläsaren. Chrome och Edge visar installation när webbläsaren tillåter den; annars visas hjälp. På iPhone: Safari > Dela > Lägg till på hemskärmen. Knappen döljs när appen körs installerad. Ingen ny SQL behövs. Appen behöver fortfarande internet för bokningar.')
+          from PIL import Image, ImageOps
+
+          source = Path('deployment/onecom/install-source')
+          out = Path('deployment/onecom/MassageBoking')
+          (source / 'src').mkdir(parents=True, exist_ok=True)
+
+          javascript = r'''
+          (() => {
+            const bar = document.getElementById('qfsv-install');
+            const button = document.getElementById('qfsv-install-button');
+            const status = document.getElementById('qfsv-install-status');
+            const dialog = document.getElementById('qfsv-install-help');
+            const instructions = document.getElementById('qfsv-install-instructions');
+
+            if (!bar || !button || !dialog) return;
+
+            const media = window.matchMedia('(display-mode: standalone)');
+            let pending = null;
+            let busy = false;
+            let installed = false;
+
+            const standalone = () =>
+              installed || media.matches || navigator.standalone === true;
+
+            const update = () => {
+              bar.hidden = standalone();
+              button.disabled = busy;
+            };
+
+            const showHelp = () => {
+              const ios =
+                /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' &&
+                 navigator.maxTouchPoints > 1);
+
+              instructions.textContent = ios
+                ? 'På iPhone eller iPad: öppna denna sida i Safari. Tryck på Dela och välj Lägg till på hemskärmen. Aktivera Öppna som webbapp om valet visas och tryck Lägg till.'
+                : 'I Chrome eller Edge: öppna webbläsarens meny med tre punkter och leta efter Installera app eller Appar → Installera den här webbplatsen som en app. Du kan också använda installationsikonen i adressfältet. Om valet saknas, prova Chrome eller Edge och öppna sidan direkt där.';
+
+              if (!dialog.open) dialog.showModal();
+            };
+
+            window.addEventListener('beforeinstallprompt', event => {
+              event.preventDefault();
+              pending = event;
+              status.textContent =
+                'Installera för att öppna bokningen direkt från hemskärmen.';
+              update();
+            });
+
+            window.addEventListener('appinstalled', () => {
+              installed = true;
+              pending = null;
+              if (dialog.open) dialog.close();
+              update();
+            });
+
+            media.addEventListener('change', update);
+
+            button.addEventListener('click', async () => {
+              if (busy || standalone()) return;
+
+              if (!pending) {
+                showHelp();
+                return;
+              }
+
+              const event = pending;
+              pending = null;
+              busy = true;
+              status.textContent = 'Öppnar installationen…';
+              update();
+
+              try {
+                await event.prompt();
+                const choice = await event.userChoice;
+
+                status.textContent = choice.outcome === 'accepted'
+                  ? 'Installationen har begärts. Följ webbläsarens anvisningar.'
+                  : 'Du kan installera appen senare när du vill.';
+              } catch {
+                status.textContent =
+                  'Öppna installationshjälpen och prova via webbläsarens meny.';
+                showHelp();
+              } finally {
+                busy = false;
+                update();
+              }
+            });
+
+            document.getElementById('qfsv-install-close')
+              .addEventListener('click', () => dialog.close());
+
+            dialog.addEventListener('close', () => {
+              if (!standalone()) button.focus();
+            });
+
+            update();
+          })();
+          '''
+
+          stylesheet = r'''
+          #qfsv-install {
+            box-sizing: border-box;
+            max-width: 1152px;
+            margin: 14px auto 0;
+            padding: 13px 18px;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            color: #17304e;
+            font-family: inherit;
+          }
+          #qfsv-install[hidden] {
+            display: none !important;
+          }
+          #qfsv-install strong {
+            font-size: 14px;
+          }
+          #qfsv-install-status {
+            font-size: 12px;
+            color: #52647e;
+            margin: 3px 0 0;
+          }
+          #qfsv-install-button,
+          #qfsv-install-close {
+            border: 0;
+            border-radius: 10px;
+            background: #2563eb;
+            color: white;
+            padding: 10px 15px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+          }
+          #qfsv-install-button:disabled {
+            opacity: .65;
+            cursor: wait;
+          }
+          #qfsv-install-help {
+            box-sizing: border-box;
+            width: calc(100% - 32px);
+            max-width: 460px;
+            border: 1px solid #dbeafe;
+            border-radius: 20px;
+            padding: 26px;
+            color: #17304e;
+            background: white;
+            box-shadow: 0 20px 70px #17304e25;
+            font-family: inherit;
+          }
+          #qfsv-install-help::backdrop {
+            background: #17304e70;
+          }
+          #qfsv-install-help h2 {
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 14px;
+          }
+          #qfsv-install-instructions {
+            font-size: 15px;
+            line-height: 1.7;
+            margin: 0 0 22px;
+          }
+          #qfsv-install button:focus-visible,
+          #qfsv-install-help button:focus-visible {
+            outline: 2px solid #2563eb;
+            outline-offset: 4px;
+          }
+          @media (max-width: 650px) {
+            #qfsv-install {
+              margin: 12px 14px 0;
+              padding: 12px;
+              flex-wrap: wrap;
+            }
+            #qfsv-install-button {
+              width: 100%;
+            }
+          }
+          @media (display-mode: standalone) {
+            #qfsv-install {
+              display: none !important;
+            }
+          }
+          '''
+
+          (source / 'src/install.js').write_text(javascript, encoding='utf-8')
+          (source / 'src/install.css').write_text(stylesheet, encoding='utf-8')
+
+          for extension in ['js', 'css']:
+            shutil.copyfile(
+              source / f'src/install.{extension}',
+              out / f'qfsv-install-v1.{extension}'
+            )
+
+          index = out / 'index.html'
+          html = index.read_text(encoding='utf-8')
+          assert 'id="qfsv-install"' not in html
+          assert '</head>' in html
+          assert '<div id="root"></div>' in html
+
+          head = '''
+          <link rel="stylesheet" href="/MassageBoking/qfsv-install-v1.css">
+          <link rel="apple-touch-icon" href="/MassageBoking/icon-192.png">
+          <script defer src="/MassageBoking/qfsv-install-v1.js"></script>
+          '''
+
+          installation = '''
+          <aside id="qfsv-install" aria-label="Installera appen" hidden>
+            <div>
+              <strong>Massage Chair Booking som app</strong>
+              <p id="qfsv-install-status" role="status">
+                Öppna bokningen direkt från hemskärmen.
+              </p>
+            </div>
+            <button id="qfsv-install-button" type="button">
+              Installera appen
+            </button>
+          </aside>
+
+          <dialog id="qfsv-install-help"
+                  aria-labelledby="qfsv-install-heading">
+            <h2 id="qfsv-install-heading">Installera appen</h2>
+            <p id="qfsv-install-instructions"></p>
+            <button id="qfsv-install-close" type="button" autofocus>
+              Stäng
+            </button>
+          </dialog>
+
+          <div id="root"></div>
+          '''
+
+          html = html.replace('</head>', head + '</head>')
+          html = html.replace('<div id="root"></div>', installation)
+          html = html.replace(
+            'href="/MassageBoking/massage-chair-v2.png"',
+            'href="/MassageBoking/icon-192.png"'
+          )
+          index.write_text(html, encoding='utf-8')
+
+          manifest_path = out / 'manifest.json'
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          manifest['background_color'] = '#ffffff'
+          manifest['theme_color'] = '#ffffff'
+          manifest['description'] = 'Boka din stund i massagestolen.'
+          manifest['icons'] = [
+            {
+              'src': '/MassageBoking/icon-192.png',
+              'sizes': '192x192',
+              'type': 'image/png',
+              'purpose': 'any'
+            },
+            {
+              'src': '/MassageBoking/icon-512.png',
+              'sizes': '512x512',
+              'type': 'image/png',
+              'purpose': 'any'
+            }
+          ]
+          manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2),
+            encoding='utf-8'
+          )
+
+          for size in [192, 512]:
+            name = f'icon-{size}.png'
+            url = 'https://zdeb.se/MassageBoking/' + name
+
+            with urllib.request.urlopen(url, timeout=30) as response:
+              raw = response.read(8 * 1024 * 1024 + 1)
+
+            if len(raw) > 8 * 1024 * 1024:
+              raise SystemExit('Ikonfilen är för stor: ' + name)
+
+            with Image.open(io.BytesIO(raw)) as image:
+              image = ImageOps.exif_transpose(image).convert('RGBA')
+              image = ImageOps.pad(
+                image,
+                (size, size),
+                Image.Resampling.LANCZOS,
+                color=(255, 255, 255, 255)
+              )
+              image.save(out / name, format='PNG')
+
+            print(f'{name}: klar som PNG {size} x {size}')
+
+          instructions = (
+            'Säkerhetskopiera MassageBoking på one.com först. '
+            'Ladda upp hela paketets MassageBoking inklusive assets. '
+            'Behåll massage-splash.png och andra egna filer. '
+            'Radera inte hela servermappen. '
+            'Ladda om med Ctrl+F5 och tryck Installera appen. '
+            'På iPhone: Safari > Dela > Lägg till på hemskärmen. '
+            'Ingen ny SQL behövs. '
+            'Appen behöver internet för bokningar.'
+          )
+
+          with zipfile.ZipFile(
+            'qfsv-installera-app.zip', 'w', zipfile.ZIP_DEFLATED
+          ) as archive:
+            for path in out.rglob('*'):
+              if path.is_file():
+                archive.write(
+                  path, 'MassageBoking/' + str(path.relative_to(out))
+                )
+            archive.writestr('LAS-MIG.txt', instructions)
+
+          print('Installationspaketet är klart.')
           PYBUILD
+
       - name: Kontrollera JavaScript
         run: node --check deployment/onecom/MassageBoking/qfsv-install-v1.js
+
       - uses: actions/upload-artifact@v4
         with:
           name: qfsv-installera-app
           path: qfsv-installera-app.zip
           if-no-files-found: error
+
       - name: Spara i GitHub
         run: |
           git switch -c "onecom-installera-app-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deployment/onecom qfsv-installera-app.zip
-          git commit -m "Installationsknapp med egen appikon"
+          git commit -m "Installationsknapp och automatiskt anpassade ikoner"
           git push origin HEAD
