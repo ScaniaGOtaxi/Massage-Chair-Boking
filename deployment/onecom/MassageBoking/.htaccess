@@ -1,0 +1,16 @@
+DirectoryIndex index.html
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /MassageBoking/
+RewriteRule ^(?:assets/|sw\.js$|manifest\.json$|icon\.svg$) - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . index.html [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+<FilesMatch "^(index\.html|qfsv-.*-pw1\.(js|css))$">
+Header set Cache-Control "no-store"
+Header always set Referrer-Policy "no-referrer"
+</FilesMatch>
+</IfModule>

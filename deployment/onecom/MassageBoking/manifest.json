@@ -1,0 +1,18 @@
+{
+  "name": "Massage Chair Booking",
+  "short_name": "QFSV",
+  "id": "/MassageBoking/",
+  "start_url": "/MassageBoking/",
+  "scope": "/MassageBoking/",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "/MassageBoking/massage-chair-v2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "background_color": "#f5f8fd",
+  "theme_color": "#2563eb"
+}

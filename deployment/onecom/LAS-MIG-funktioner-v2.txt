@@ -1,0 +1,81 @@
+QFSV – Uppdatering för one.com, version funktioner 2
+2026-10-16
+
+INNEHÅLL
+- Logga ut finns bara i Settings och avslutar sessionen i denna webbläsare.
+- Mina bokningar: kommande tider, historik, bekräftelse före avbokning.
+- Personlig statistik och gemensamma summeringar för alla inloggade.
+- Datumfilter, bokade timmar, framtida bokningar separat och populära starttider.
+- Ny startvy och massagestol vid inloggning; ingen avsiktlig extra väntetid.
+- Tidigare rättningar av bokningstider och lösenordsåterställning följer med.
+- Rättad scrollning i installerad app och möjlighet att zooma på mobilen.
+
+1. SÄKERHETSKOPIERA
+Ladda ned den nuvarande mappen MassageBoking från one.com innan du byter filer.
+
+2. LADDA UPP APPEN
+Packa upp ZIP-filen på datorn.
+Öppna one.coms filhanterare och webbplatsens befintliga mapp MassageBoking.
+Ladda upp ALLT INNEHÅLL i paketets mapp MassageBoking dit och ersätt samma filnamn.
+Behåll underkatalogen assets och alla filer där.
+Resultatet ska vara MassageBoking/index.html och MassageBoking/assets/...
+Skapa inte en extra nivå MassageBoking/MassageBoking.
+Ladda INTE upp Supabase, Utveckling, GitHub eller denna instruktion till webbplatsen.
+
+3. AKTIVERA GEMENSAM STATISTIK
+Öppna rätt projekt i Supabase > SQL Editor > New query.
+Klistra in innehållet i Supabase/01-gemensam-statistik.sql och kör det.
+Filen lägger bara till den nya summeringsfunktionen och dess körbehörigheter.
+Den ändrar inga befintliga bokningar, användare eller RLS-policyer.
+SQL behöver inte köras för egen statistik, avbokning, startbild eller utloggning.
+Om den inte har körts visar Gemensam statistik en tydlig förklaring.
+Kör inte andra eller äldre migrationsfiler som del av denna uppdatering.
+
+4. KONTROLLERA
+Öppna https://zdeb.se/MassageBoking/ och ladda om med Ctrl+F5.
+- Kontrollera stolbilden och logga in som vanlig användare.
+- Boka en framtida testtid, öppna Mina bokningar och avboka den.
+- Kontrollera att tiden går att boka igen.
+- Öppna Statistik: Min statistik och Gemensam statistik.
+- Öppna Settings: Logga ut. Ladda om och kontrollera att du är utloggad.
+- Kontrollera även mobilvy och adminfunktioner med ett administratörskonto.
+Dessa kontroller på den publicerade webbplatsen är ännu inte utförda åt dig.
+
+OM ÅTERSTÄLLNING AV LÖSENORD GÅR TILL LOCALHOST
+I Supabase > Authentication > URL Configuration:
+Site URL: https://zdeb.se/MassageBoking/
+Tillåt följande Redirect URLs:
+https://zdeb.se/MassageBoking/reset-password
+https://www.zdeb.se/MassageBoking/reset-password
+Begär därefter ett NYTT återställningsmejl i samma webbläsare.
+
+VAD STATISTIKEN BETYDER
+Tider räknas i Europe/Stockholm, även vid sommar-/vintertid.
+Bokade timmar betyder reserverad tid, inte verifierad användning av stolen.
+Framtida bokningar visas separat från bokningar med passerad starttid.
+Avbokningar som raderats går inte att räkna historiskt utan en separat logg.
+Gemensam statistik lämnar bara ut antal och bokade minuter per datum/starttid.
+Den lämnar inte ut användar-ID, namn, e-post eller avdelning.
+Den nuvarande datamodellen saknar stol-ID. Därför läggs inga påhittade
+jämförelser mellan flera stolar eller beläggningsprocent till här.
+Adminpanelens befintliga detaljerade vyer finns kvar.
+
+UTVECKLING OCH GITHUB
+Utveckling innehåller läsbar kod för de nya funktionerna, byggskript och tester.
+Den matchande ursprungliga React-källkoden för denna publicerade version saknas.
+Bygget utgår därför från den kända one.com-versionen i GitHub:
+5a8787ac4f898dc131d95a9d7a47c5dbd26cadab
+Ingen hemlig Supabase-servernyckel behövs för att bygga klienten.
+Den publika klientnyckeln i den befintliga appen behålls.
+
+GitHub/onecom-funktioner-v2.yml är ett alternativ om du vill bygga paketet i Actions.
+1. Ladda upp massage-chair-v2.png i roten av GitHub-repot. Bilden finns i MassageBoking.
+2. Skapa .github/workflows/onecom-funktioner-v2.yml med arbetsflödets innehåll.
+3. Spara på main, öppna Actions > one.com – funktioner 2 > Run workflow.
+4. Hämta paketet från Artifacts när körningen är grön.
+Arbetsflödet sparar också appen i en separat gren. Det publicerar inte till one.com.
+GitHub-arbetsflödet är förberett och dess byggsteg testat lokalt; det är inte kört i GitHub här.
+
+ÅTERGÅ VID PROBLEM
+Återställ hela den säkerhetskopierade mappen MassageBoking och ladda om.
+Summeringsfunktionen kan lämnas kvar utan att den äldre appen använder den.
