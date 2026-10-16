@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="description" content="Book your massage chair sessions easily" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Massage Chair Booking" />
+    <meta name="apple-mobile-web-app-title" content="Massage Chair Booking" />
+    <meta name="msapplication-TileColor" content="#ffffff" />
+    <meta name="msapplication-tap-highlight" content="no" />
+
+    <!-- iOS specific meta tags -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-touch-fullscreen" content="yes">
+
+    <!-- iOS splash screens -->
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <!-- iOS icons -->
+    
+    
+    
+
+    <title>Massage Chair Booking</title>
+    <link rel="manifest" href="/MassageBoking/manifest.json" />
+    
+    
+    <script type="module" crossorigin src="/MassageBoking/assets/index-D0UV-BkB.js"></script>
+    <link rel="modulepreload" crossorigin href="/MassageBoking/assets/react-vendor-CZ0cz5LI.js">
+    <link rel="modulepreload" crossorigin href="/MassageBoking/assets/supabase-CzxejXD4.js">
+    <link rel="stylesheet" crossorigin href="/MassageBoking/assets/index-BM_QvYR0.css">
+  <link rel="icon" href="/MassageBoking/icon.svg"></head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // Register service worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/MassageBoking/sw.js')
+            .then(registration => {
+              console.log('ServiceWorker registration successful');
+            })
+            .catch(err => {
+              console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+      }
+
+      // iOS PWA status bar handler
+      if (window.navigator.standalone) {
+        document.documentElement.classList.add('ios-pwa');
+      }
+    </script>
+  </body>
+</html>
