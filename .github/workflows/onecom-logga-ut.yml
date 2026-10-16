@@ -1,0 +1,104 @@
+name: Lägg till Logga ut
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 5a8787ac4f898dc131d95a9d7a47c5dbd26cadab
+
+      - name: Bygg appen
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          import shutil
+          import zipfile
+
+          src = Path('deployment/onecom/MassageBoking')
+          out = Path('/tmp/logout/MassageBoking')
+          shutil.copytree(src, out, dirs_exist_ok=True)
+
+          main = out/'assets/index-D0UV-BkB.timefix1.pwfix1.js'
+          s = main.read_text()
+
+          helper = '''const pending=new WeakMap();
+          export function logOut(client,redirect=()=>window.location.assign('/MassageBoking/')){
+           if(pending.has(client))return pending.get(client);
+           const request=Promise.resolve().then(async()=>{
+            const {error}=await client.auth.signOut({scope:'local'});
+            if(error)throw error;
+            redirect();return {error:null};
+           }).finally(()=>pending.delete(client));
+           pending.set(client,request);return request;
+          }
+          '''
+          (out/'assets/qfsv-logout-v1.js').write_text(helper)
+
+          component = '''function QFSV_LogoutButton(){const[busy,setBusy]=n.useState(false),[error,setError]=n.useState('');return e.jsxs('div',{children:[e.jsx('button',{type:'button',disabled:busy,'aria-busy':busy,onClick:async()=>{if(busy)return;setBusy(true);setError('');try{await QFSV_LogOut(u)}catch{setError('Kunde inte logga ut. Kontrollera anslutningen och försök igen.');setBusy(false)}},className:'px-2 py-2 rounded-md bg-white text-gray-700 shadow-sm',children:busy?'Loggar ut…':'Logga ut'}),error&&e.jsx('p',{role:'alert',children:error})]})}
+          '''
+
+          anchor = 'e.jsx("span",{className:"xs:hidden",children:"Set"})]})]})'
+          assert s.count(anchor) == 1
+          s = s.replace(
+              anchor,
+              'e.jsx("span",{className:"xs:hidden",children:"Set"})]}),e.jsx(QFSV_LogoutButton,{})]})'
+          )
+          s = 'import{logOut as QFSV_LogOut}from"./qfsv-logout-v1.js";\n' + component + s
+          main.write_text(s)
+
+          for p in (out/'assets').glob('UserSettings-*.js'):
+              s = p.read_text()
+              assert s.count('await l.auth.signOut()') == 1
+              p.write_text(
+                  'import{logOut as QFSV_LogOut}from"./qfsv-logout-v1.js";\n'
+                  + s.replace('await l.auth.signOut()', 'await QFSV_LogOut(l)')
+              )
+
+          files = list(out.rglob('*.js'))
+          mapping = {p.name: p.stem + '.logout1.js' for p in files}
+
+          for p in list(out.rglob('*')):
+              if p.is_file() and p.suffix in ('.js', '.html'):
+                  s = p.read_text()
+                  for old, new in mapping.items():
+                      s = s.replace(old, new)
+                  p.write_text(s)
+
+          for p in files:
+              p.rename(p.with_name(mapping[p.name]))
+
+          shutil.rmtree(src)
+          shutil.copytree(out, src)
+
+          with zipfile.ZipFile('qfsv-logga-ut.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+              for p in out.rglob('*'):
+                  if p.is_file():
+                      z.write(p, p.relative_to(out.parent))
+
+          print('Paket med Logga ut är klart')
+          PYBUILD
+
+      - name: Kontrollera JavaScript
+        run: |
+          find deployment/onecom/MassageBoking -name '*.js' -exec node --check {} \;
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-logga-ut
+          path: qfsv-logga-ut.zip
+
+      - name: Spara i separat gren
+        run: |
+          git switch -c "onecom-logga-ut-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/onecom/MassageBoking
+          git commit -m "Lägg till säker utloggning på one.com"
+          git push origin HEAD
