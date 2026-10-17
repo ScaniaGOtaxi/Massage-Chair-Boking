@@ -1,0 +1,107 @@
+name: Netlify med Hjalp
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 54890f8367128d2bd729d9e13c6a6e5a76e88734
+
+      - name: Skapa Hjalp och paket
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          import json,zipfile
+
+          out=Path('deployment/netlify-app-v2')
+          sections=[
+          ['Boka en tid','Öppna Boka. Välj en eller två sessioner: varje session är 20 minuter. Välj sedan en ledig starttid. Kontrollera starttid, sluttid och längd i sammanfattningen och tryck på bokningsknappen. Kontrollera därefter att bokningen finns under Mina bokningar.','Bokningar kan bara skapas för dagens datum. Tider som redan har passerat kan inte bokas. Hela det valda tidsintervallet måste vara ledigt.'],
+          ['Varför blir en ledig starttid röd?','Exempel: du har en bokning 12:00–12:40. Med en session kan du boka 11:40–12:00. Med två sessioner kan du inte börja 11:40, eftersom tiden då skulle sluta 12:20 och överlappa din bokning.','Du kan börja 12:40 och boka två sessioner till 13:20 om hela tiden är ledig. En bokning får börja exakt när en annan slutar. En röd ruta betyder därför inte alltid att just det 20-minuterspasset är bokat: den valda längden kan överlappa en senare bokning.'],
+          ['Färger och vald tid','Blå: vald starttid. Kontrollera hela tidsintervallet i sammanfattningen. Röd: starttiden överlappar en bokning med den längd du valt. Gul: den valda längden ryms inte före stängning. Grå: tiden har passerat. Ljus eller vit: möjlig starttid för den valda längden.','En bokning 12:00–12:40 omfattar två pass, 12:00 och 12:20. Båda visas som upptagna, men det är en bokning under Mina bokningar.'],
+          ['Bekräfta och uppdatera','En tid blir bokad när bokningen har sparats och finns under Mina bokningar. Använd Uppdatera/Refresh för att hämta aktuell tillgänglighet. Någon annan kan ha bokat en tid sedan du öppnade sidan.','Om bekräftelsen uteblir: uppdatera Mina bokningar och kontrollera resultatet innan du försöker boka samma tid igen.'],
+          ['Mina bokningar och avbokning','Under Mina bokningar → Kommande ser du dina kommande bokningar. Välj Avboka på rätt bokning och följ bekräftelsen. När appen bekräftar avbokningen blir tiden tillgänglig igen.','Om ett fel visas och bokningen finns kvar är avbokningen inte bekräftad. Uppdatera listan och försök igen. Historik visar tidigare bokningar som finns kvar i systemet.'],
+          ['Alla bokningar','Alla bokningar ger en överblick över bokningarna. Vanliga användare kan avboka sina egna kommande bokningar via Mina bokningar.'],
+          ['Statistik och Statistik ALL','Välj period för statistiken. Statistik ALL omfattar hela den sparade bokningshistoriken från första bokningen, även över flera år.','Bokad tid visar reserverade timmar. Beläggningsgrad jämför bokad tid med tillgängliga öppettimmar. Populäraste tiderna visar veckodagar och klockslag som bokas mest. Utveckling över tid jämför månader och år. Nya och återkommande användare visar förstagångsbokare och personer som bokar igen.','Öppettid och beläggning räknas för måndag till fredag. Lördag och söndag räknas inte som öppetdagar. Statistiken visar bokad tid, inte uppmätt användning av stolen. Avbokningar som har tagits bort ingår inte i den sparade historiken.'],
+          ['Inställningar, konto och lösenord','Under Inställningar/Settings kan du hantera profilbild, visningsnamn och avdelning. Logga ut finns också här. Logga gärna ut på en delad dator.','Har du glömt lösenordet? Använd återställningen på inloggningssidan. Begär en ny länk om den tidigare länken har gått ut.'],
+          ['Installera appen – frivilligt','Appen fungerar direkt i webbläsaren. Om webbläsaren stöder installation kan Installera appen skapa en genväg på datorn eller telefonens hemskärm.','Välj Nej tack för att stänga installationsrutan. Installationsalternativet finns även under Inställningar.'],
+          ['Helskärm och uppstart','Under Boka finns Aktivera helskärm. Välj Avsluta helskärm eller tryck Esc på datorn för att lämna läget. Stöd beror på webbläsaren.','Startbilden visas i ungefär fyra sekunder vid första öppningen i en fliksession. När du uppdaterar sidan hoppas den över. En ny separat flik kan visa startbilden igen.'],
+          ['För administratörer','Admin → Kommande bokningar visar kommande bokningar för alla användare. Sök efter namn, e-post eller datum. Administratörer kan avboka andras kommande bokningar. Kontrollera alltid person, datum och tid före bekräftelsen.'],
+          ['Om något inte fungerar','Kan en tid inte väljas? Kontrollera antal sessioner och att hela tidsintervallet är ledigt. Saknas bokningen? Uppdatera Mina bokningar innan du bokar igen. Misslyckas avbokningen? Kontrollera om bokningen finns kvar.','Ladda om sidan om uppgifter verkar gamla. Kontakta administratören om problemet kvarstår och ange vad du gjorde samt eventuellt felmeddelande.']
+          ]
+
+          helpjs="\nconst QFSV_HELP="+json.dumps(sections,ensure_ascii=False)+";\n"+'''function QFSV_Help(){return h('section',{className:'qfsv-help','aria-label':'Hjälp för Massage Chair Booking'},
+           h('h2',{tabIndex:-1},'Hjälp'),h('p',null,'Så fungerar Massage Chair Booking. Öppna ett avsnitt för att läsa mer.'),
+           ...QFSV_HELP.map(([title,...paragraphs],i)=>h('details',{key:title,open:i===1},h('summary',null,title),...paragraphs.map((text,j)=>h('p',{key:j},text)))));}
+          '''
+
+          for p in out.glob('assets/qfsv-features-v2*.js'):
+           s=p.read_text()
+           old="['all','Alla bokningar']];"
+           assert s.count(old)==1
+           s=s.replace(old,"['all','Alla bokningar'],['help','Hjälp']];")
+           old="tab==='stats'?h(Stats):h(List)"
+           assert s.count(old)==1
+           s=s.replace(old,"tab==='stats'?h(Stats):tab==='help'?h(QFSV_Help):h(List)")
+           p.write_text(s+helpjs)
+
+          p=out/'qfsv-features-v2.css'
+          assert p.is_file()
+          p.write_text(p.read_text()+'''
+          .qfsv-help{background:#fff;border-radius:20px;padding:clamp(18px,3vw,32px);color:#123457}
+          .qfsv-help h2{font-size:28px;margin:0 0 12px}
+          .qfsv-help>p{color:#526b88;margin-bottom:24px}
+          .qfsv-help details{border:1px solid #dce6f5;border-radius:12px;margin:12px 0;padding:0 18px}
+          .qfsv-help summary{cursor:pointer;padding:18px 0;font-weight:600;color:#174fba}
+          .qfsv-help summary:focus-visible{outline:2px solid #2563eb;outline-offset:3px}
+          .qfsv-help details p{line-height:1.75;margin:0 0 18px;max-width:85ch;overflow-wrap:anywhere}
+          .qfsv-help details[open]{background:#f7faff}
+          .qfsv-help summary::marker{color:#2563eb}
+          ''')
+
+          files=list(out.rglob('*.js'))
+          names={p.name:p.stem+'.help1.js' for p in files if p.name!='sw.js'}
+          for p in out.rglob('*'):
+           if p.is_file() and p.suffix in ['.js','.html']:
+            s=p.read_text()
+            for old,new in names.items():
+             s=s.replace(old,new)
+            p.write_text(s)
+          for p in files:
+           if p.name in names:
+            p.rename(p.with_name(names[p.name]))
+
+          with zipfile.ZipFile('qfsv-netlify-hjalp.zip','w',zipfile.ZIP_DEFLATED) as z:
+           for p in sorted(out.rglob('*')):
+            if p.is_file():
+             z.write(p,'netlify-app/'+p.relative_to(out).as_posix())
+           z.writestr('LAS-MIG.txt','Packa upp och dra hela mappen netlify-app till Netlify > qfsv > Deploys. Hjalp ligger sist i flikmenyn efter Alla bokningar. Tidigare funktioner och ikoner ingar.')
+          print('Komplett Netlify-paket med Hjalp skapat.')
+          PYBUILD
+
+      - name: Kontrollera paket
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find deployment/netlify-app-v2 -name '*.js' -print0)
+          python3 -m zipfile -t qfsv-netlify-hjalp.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-netlify-hjalp
+          path: qfsv-netlify-hjalp.zip
+          if-no-files-found: error
+
+      - name: Spara i GitHub
+        run: |
+          git switch -c "netlify-hjalp-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/netlify-app-v2 qfsv-netlify-hjalp.zip
+          git commit -m "Lagg Hjalp sist i bokningsmenyn"
+          git push origin HEAD
