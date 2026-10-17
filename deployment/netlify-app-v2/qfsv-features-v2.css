@@ -35,3 +35,13 @@ button.qfsv-danger{color:#bf2432;border-color:#f1c9ce}button.qfsv-danger:hover{b
 
 .qfsv-admin-search{display:grid;gap:7px;color:#475569;font-size:14px;margin:16px 0}
 .qfsv-admin-search input{width:100%;max-width:480px;border:1px solid #dbe5f3;border-radius:10px;padding:11px;background:white;color:#17304e}
+
+.qfsv-help{background:#fff;border-radius:20px;padding:clamp(18px,3vw,32px);color:#123457}
+.qfsv-help h2{font-size:28px;margin:0 0 12px}
+.qfsv-help>p{color:#526b88;margin-bottom:24px}
+.qfsv-help details{border:1px solid #dce6f5;border-radius:12px;margin:12px 0;padding:0 18px}
+.qfsv-help summary{cursor:pointer;padding:18px 0;font-weight:600;color:#174fba}
+.qfsv-help summary:focus-visible{outline:2px solid #2563eb;outline-offset:3px}
+.qfsv-help details p{line-height:1.75;margin:0 0 18px;max-width:85ch;overflow-wrap:anywhere}
+.qfsv-help details[open]{background:#f7faff}
+.qfsv-help summary::marker{color:#2563eb}
