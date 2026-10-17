@@ -1,0 +1,333 @@
+name: Admin kommande bokningar
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 5db025b6a5777ff839a34041c9a51ce81f945745
+
+      - name: Bygg adminavbokning
+        run: |
+          python3 - <<'PYBUILD'
+          ADMIN_JS=r'''const dayFmt=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Stockholm',year:'numeric',month:'2-digit',day:'2-digit'});
+          const timeFmt=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Stockholm',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+          const clock=now=>({date:dayFmt.format(now),time:timeFmt.format(now)});
+
+          export function upcoming(row,now=new Date()){
+           const current=clock(now);
+           return row.date>current.date||(row.date===current.date&&row.start_time.slice(0,8)>current.time);
+          }
+
+          export async function requireAdmin(client){
+           const {data,error}=await client.auth.getUser();
+           if(error||!data?.user)throw new Error('Du behöver logga in igen.');
+           const result=await client.from('admins').select('id').eq('user_id',data.user.id).maybeSingle();
+           if(result.error||!result.data)throw new Error('Du behöver administratörsbehörighet.');
+           return data.user;
+          }
+
+          export async function fetchUpcoming(client,now=new Date()){
+           await requireAdmin(client);
+           const current=clock(now),rows=[];
+           for(let offset=0;;offset+=500){
+            const {data,error}=await client.from('bookings')
+             .select('id,user_id,name,email,date,start_time,end_time,sessions')
+             .or(`date.gt.${current.date},and(date.eq.${current.date},start_time.gt.${current.time})`)
+             .order('date',{ascending:true})
+             .order('start_time',{ascending:true})
+             .order('id',{ascending:true})
+             .range(offset,offset+499);
+            if(error||!Array.isArray(data))
+             throw new Error('Kunde inte hämta alla kommande bokningar. Försök igen.');
+            rows.push(...data);
+            if(data.length<500)break;
+           }
+           return rows;
+          }
+
+          export async function cancelAsAdmin(client,row,now=new Date()){
+           await requireAdmin(client);
+           if(!upcoming(row,now))
+            throw new Error('Bokningen har redan börjat. Uppdatera listan.');
+           const current=clock(now);
+           const {data,error}=await client.from('bookings').delete()
+            .eq('id',row.id)
+            .eq('user_id',row.user_id)
+            .eq('date',row.date)
+            .eq('start_time',row.start_time)
+            .or(`date.gt.${current.date},and(date.eq.${current.date},start_time.gt.${current.time})`)
+            .select('id,user_id,date,start_time').single();
+           if(error?.code==='42501')
+            throw new Error('Databasen tillåter inte avbokningen. Kontrollera administratörsbehörigheten.');
+           if(error||data?.id!==row.id)
+            throw new Error('Avbokningen kunde inte bekräftas. Bokningen kan ha ändrats. Uppdatera listan.');
+           return data.id;
+          }
+
+          export function AdminUpcoming({React:R,client}){
+           const h=R.createElement;
+           const [rows,setRows]=R.useState([]);
+           const [loading,setLoading]=R.useState(true);
+           const [error,setError]=R.useState('');
+           const [notice,setNotice]=R.useState('');
+           const [pending,setPending]=R.useState(null);
+           const [search,setSearch]=R.useState('');
+           const [now,setNow]=R.useState(()=>new Date());
+           const generation=R.useRef(0),lock=R.useRef(false),alive=R.useRef(true);
+           const label=d=>new Intl.DateTimeFormat('sv-SE',{
+            timeZone:'Europe/Stockholm',day:'numeric',month:'long',year:'numeric'
+           }).format(new Date(d+'T12:00:00Z'));
+           const name=row=>row.name||row.email||'Användare';
+
+           async function refresh(){
+            const request=++generation.current;
+            setLoading(true);setError('');
+            try{
+             const data=await fetchUpcoming(client);
+             if(request===generation.current){
+              setRows(data);setNow(new Date());
+             }
+            }catch(e){
+             if(request===generation.current){
+              setRows([]);setError(e.message);
+             }
+            }finally{
+             if(request===generation.current)setLoading(false);
+            }
+           }
+
+           R.useEffect(()=>{
+            alive.current=true;refresh();
+            const timer=setInterval(()=>setNow(new Date()),15000);
+            return()=>{
+             alive.current=false;
+             generation.current++;
+             clearInterval(timer);
+            };
+           },[]);
+
+           async function cancel(row){
+            if(lock.current)return;
+            if(!window.confirm(`Avboka ${name(row)}s bokning den ${label(row.date)} kl. ${row.start_time.slice(0,5)}–${row.end_time.slice(0,5)}?`))return;
+            lock.current=true;
+            setPending(row.id);setError('');setNotice('');
+            try{
+             await cancelAsAdmin(client,row);
+             if(alive.current){
+              setRows(old=>old.filter(item=>item.id!==row.id));
+              setNotice('Bokningen är avbokad. Tiden är tillgänglig igen.');
+              window.dispatchEvent(new Event('qfsv:bookings-changed'));
+             }
+            }catch(e){
+             if(alive.current)setError(e.message);
+            }finally{
+             lock.current=false;
+             if(alive.current){
+              setPending(null);setNow(new Date());
+             }
+            }
+           }
+
+           const current=rows.filter(row=>upcoming(row,now));
+           const term=search.trim().toLocaleLowerCase('sv-SE');
+           const visible=current.filter(row=>
+            [name(row),row.email||'',row.date].join(' ')
+             .toLocaleLowerCase('sv-SE').includes(term)
+           );
+
+           return h('section',{
+            className:'qfsv-panel',
+            'aria-label':'Kommande bokningar för administratör'
+           },
+            h('div',{className:'qfsv-toolbar'},
+             h('div',null,
+              h('h2',null,'Kommande bokningar'),
+              h('p',null,'Se och avboka kommande bokningar för alla användare. Tider visas i svensk tidszon.')
+             ),
+             h('button',{
+              type:'button',onClick:refresh,disabled:loading||!!pending
+             },loading?'Hämtar…':'Uppdatera')
+            ),
+            h('label',{className:'qfsv-admin-search'},
+             'Sök användare eller datum',
+             h('input',{
+              type:'search',value:search,
+              onChange:e=>setSearch(e.target.value),
+              placeholder:'Namn, e-post eller ÅÅÅÅ-MM-DD'
+             })
+            ),
+            error&&h('p',{role:'alert',className:'qfsv-error'},error),
+            h('p',{role:'status',className:'qfsv-success'},notice),
+            loading
+             ?h('p',null,'Hämtar bokningar…')
+             :!error&&h('p',null,`${visible.length} av ${current.length} kommande bokningar`),
+            !loading&&!error&&visible.length===0&&h('p',{
+             className:'qfsv-empty'
+            },current.length?'Inga bokningar matchar sökningen.':'Det finns inga kommande bokningar.'),
+            !loading&&h('ul',{className:'qfsv-booking-list'},
+             visible.map(row=>h('li',{
+              key:row.id,className:'qfsv-booking'
+             },
+              h('div',null,
+               h('h3',null,name(row)),
+               row.email&&h('p',{className:'qfsv-muted'},row.email),
+               h('p',null,`${label(row.date)} · ${row.start_time.slice(0,5)}–${row.end_time.slice(0,5)}`)
+              ),
+              h('button',{
+               type:'button',className:'qfsv-danger',disabled:!!pending,
+               onClick:()=>cancel(row),
+               'aria-label':`Avboka ${name(row)} ${row.date} kl. ${row.start_time.slice(0,5)}`
+              },pending===row.id?'Avbokar…':'Avboka')
+             ))
+            )
+           );
+          }
+          '''
+
+          from pathlib import Path
+          import zipfile
+          import re
+
+          out=Path('deployment/netlify-app-v2')
+          assets=out/'assets'
+          (assets/'qfsv-admin-upcoming-v1.js').write_text(ADMIN_JS,encoding='utf-8')
+
+          count=0
+          for p in assets.glob('AdminPanel-*.js'):
+           s=p.read_text()
+           start=s.index('function Re(){')
+           block=s[start:]
+           marker='children:[e.jsxs("button",{onClick:()=>y("users")'
+           assert block.count(marker)==1
+           button='e.jsx("button",{type:"button",onClick:()=>y("upcoming"),"aria-current":u==="upcoming"?"page":void 0,className:`px-4 py-2 rounded-md ${u==="upcoming"?"bg-blue-600 text-white":"text-gray-700"}`,children:"Kommande bokningar"}),'
+           block=block.replace(
+            marker,
+            'children:['+button+'e.jsxs("button",{onClick:()=>y("users")'
+           )
+           marker='children:u==="users"?e.jsx(we,{})'
+           assert block.count(marker)==1
+           block=block.replace(
+            marker,
+            'children:u==="upcoming"?e.jsx(QFSV_AdminUpcoming,{React:d,client:j}):u==="users"?e.jsx(we,{})'
+           )
+           p.write_text(
+            'import{AdminUpcoming as QFSV_AdminUpcoming}from"./qfsv-admin-upcoming-v1.js";\n'+s[:start]+block,
+            encoding='utf-8'
+           )
+           count+=1
+          assert count==2
+
+          p=out/'qfsv-features-v2.css'
+          p.write_text(p.read_text()+'''
+          .qfsv-admin-search{display:grid;gap:7px;color:#475569;font-size:14px;margin:16px 0}
+          .qfsv-admin-search input{width:100%;max-width:480px;border:1px solid #dbe5f3;border-radius:10px;padding:11px;background:white;color:#17304e}
+          ''')
+
+          fullscreen=next(assets.glob('qfsv-fullscreen-v1*.js'))
+          text=fullscreen.read_text()
+          old='FullscreenSettings({React:R})'
+          assert text.count(old)==1
+          text=text.replace(old,'FullscreenSettings({React:R,compact=false})')
+          marker=" return h('section',{className:'qfsv-screen-card'"
+          assert text.count(marker)==1
+          compact=""" if(compact)return h('div',{className:'qfsv-screen-compact'},h('button',{type:'button',onClick:toggle,disabled:busy||!supported,'aria-pressed':active},supported?(active?'Avsluta helskärm':'Aktivera helskärm'):'Helskärm stöds inte'),error&&h('p',{role:'alert'},error));
+          """
+          text=text.replace(marker,compact+marker)
+          fullscreen.write_text(text)
+
+          for p in assets.glob('UserSettings-*.js'):
+           text=p.read_text()
+           marker='e.jsx(QFSV_Fullscreen,{React:o}),'
+           assert text.count(marker)==1
+           text=text.replace(marker,'')
+           text,count=re.subn(
+            r'import\{FullscreenSettings as QFSV_Fullscreen\}from"[^"]+";\n',
+            '',text
+           )
+           assert count==1
+           p.write_text(text)
+
+          for p in assets.glob('BookingsAndStats-*.js'):
+           text=p.read_text()
+           marker='e.jsx("div",{className:"flex justify-end",children:e.jsxs("button",{type:"button",onClick:r,disabled:m'
+           assert text.count(marker)==1
+           text=text.replace(
+            marker,
+            'e.jsxs("div",{className:"qfsv-booking-toolbar",children:[e.jsx(QFSV_Fullscreen,{React:h,compact:true}),e.jsxs("button",{type:"button",onClick:r,disabled:m'
+           )
+           marker=',"Refresh"]})}),e.jsxs("div"'
+           assert text.count(marker)==1
+           text=text.replace(marker,',"Refresh"]})]}),e.jsxs("div"')
+           p.write_text(
+            'import{FullscreenSettings as QFSV_Fullscreen}from"./'+fullscreen.name+'";\n'+text
+           )
+
+          p=out/'qfsv-install-v1.css'
+          p.write_text(p.read_text()+'''
+          .qfsv-booking-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+          .qfsv-screen-compact{max-width:100%}
+          .qfsv-screen-compact button{background:white;color:#2563eb;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px;font-size:14px}
+          .qfsv-screen-compact button[aria-pressed=true]{background:#2563eb;color:white}
+          .qfsv-screen-compact button:disabled{opacity:.55}
+          .qfsv-screen-compact button:focus-visible{outline:2px solid #2563eb;outline-offset:3px}
+          .qfsv-screen-compact p[role=alert]{color:#b91c1c;font-size:13px;max-width:440px}
+          ''')
+
+          files=list(out.rglob('*.js'))
+          names={
+           p.name:p.stem+'.admincancel1.js'
+           for p in files if p.name!='sw.js'
+          }
+          for p in out.rglob('*'):
+           if p.is_file() and p.suffix in ['.js','.html']:
+            text=p.read_text()
+            for old,new in names.items():
+             text=text.replace(old,new)
+            p.write_text(text)
+          for p in files:
+           if p.name in names:
+            p.rename(p.with_name(names[p.name]))
+
+          with zipfile.ZipFile(
+           'qfsv-netlify-admin-avbokning.zip','w',zipfile.ZIP_DEFLATED
+          ) as archive:
+           for p in out.rglob('*'):
+            if p.is_file():
+             archive.write(p,'netlify-app/'+str(p.relative_to(out)))
+           archive.writestr(
+            'LAS-MIG.txt',
+            'Publicera mappen netlify-app under Netlify > qfsv > Deploys. '
+            'Ctrl+F5. Admin > Kommande bokningar: välj Avboka och bekräfta. '
+            'Befintlig administratörsbehörighet i Supabase krävs. '
+            'Helskärm finns nu i Boka-vyn till vänster om Refresh. '
+            'Övriga funktioner behålls.'
+           )
+
+          print('Adminavbokning och flyttad helskärm är klara.')
+          PYBUILD
+
+      - name: Kontrollera JavaScript
+        run: find deployment/netlify-app-v2 -name '*.js' -exec node --check {} \;
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-netlify-admin-avbokning
+          path: qfsv-netlify-admin-avbokning.zip
+          if-no-files-found: error
+
+      - name: Spara i GitHub
+        run: |
+          git switch -c "netlify-admin-avbokning-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/netlify-app-v2 qfsv-netlify-admin-avbokning.zip
+          git commit -m "Admin kan avboka kommande bokningar"
+          git push origin HEAD
