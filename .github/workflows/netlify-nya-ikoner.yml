@@ -1,0 +1,143 @@
+name: Netlify version 2 med nya ikoner
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 437e1957f96881f1fe618e9c364e7263695ab432
+
+      - name: Rätta splash och inloggningsbild
+        shell: bash
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+
+          out=Path('deployment/netlify-app-v2')
+          p=out/'index.html'
+          s=p.read_text()
+          assert 'qfsv-splash-seen-v1' not in s
+          marker='<meta charset="UTF-8" />'
+          assert s.count(marker)==1
+          bootstrap='''
+          <style>
+          html.qfsv-splash-skip #qfsv-splash{display:none!important}
+          </style>
+          <script>
+          (()=>{
+           let show=true;
+           try{
+            show=sessionStorage.getItem('qfsv-splash-seen-v1')!=='yes';
+            sessionStorage.setItem('qfsv-splash-seen-v1','yes');
+           }catch{
+            show=performance.getEntriesByType('navigation')[0]?.type!=='reload';
+           }
+           if(!show)document.documentElement.classList.add('qfsv-splash-skip');
+          })();
+          </script>
+          '''
+          p.write_text(s.replace(marker,marker+bootstrap))
+
+          p=next(out.glob('qfsv-splash-v4*.js'))
+          s=p.read_text()
+          marker=' if(!splash||!root)return;'
+          assert s.count(marker)==1
+          s=s.replace(marker,marker+"\n if(document.documentElement.classList.contains('qfsv-splash-skip')){splash.remove();return;}")
+          p.write_text(s)
+
+          changed=0
+          for p in (out/'assets').glob('index-D0UV-BkB*.js'):
+           s=p.read_text()
+           old='className:"qfsv-login-brand",children:[e.jsx("img",{src:"/massage-chair-v2.png"'
+           new='className:"qfsv-login-brand",children:[e.jsx("img",{src:"/massage-splash.png"'
+           changed+=s.count(old)
+           p.write_text(s.replace(old,new))
+          assert changed==1, 'Inloggningsbilden kunde inte hittas'
+
+          files=list(out.rglob('*.js'))
+          names={p.name:p.stem+'.startlogin2.js' for p in files if p.name!='sw.js'}
+          for p in out.rglob('*'):
+           if p.is_file() and p.suffix in ['.js','.html']:
+            s=p.read_text()
+            for old,new in names.items():
+             s=s.replace(old,new)
+            p.write_text(s)
+          for p in files:
+           if p.name in names:
+            p.rename(p.with_name(names[p.name]))
+          PYBUILD
+
+      - name: Skapa genomskinliga ikoner
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y imagemagick
+          cd deployment/netlify-app-v2
+
+          convert -size 1254x1254 xc:black -fill white \
+            -draw 'ellipse 623,609 607,590 0,360' /tmp/qfsv-mask.png
+          convert massage-splash.png /tmp/qfsv-mask.png -alpha off \
+            -compose CopyOpacity -composite /tmp/qfsv-transparent.png
+
+          for size in 192 512; do
+            convert /tmp/qfsv-transparent.png -resize "${size}x${size}" "icon-${size}.png"
+            cp "icon-${size}.png" "icon-${size}-v2.png"
+          done
+
+          cd ../..
+          python3 - <<'PYICONS'
+          from pathlib import Path
+          import json,zipfile
+
+          out=Path('deployment/netlify-app-v2')
+          p=out/'manifest.json'
+          m=json.loads(p.read_text())
+          for icon in m['icons']:
+           icon['src']='/icon-'+icon['sizes'].split('x')[0]+'-v2.png'
+           icon['purpose']='any'
+           assert (out/icon['src'].lstrip('/')).is_file()
+          m['background_color']='#ffffff'
+          m['theme_color']='#ffffff'
+          p.write_text(json.dumps(m,ensure_ascii=False,indent=2))
+
+          p=out/'index.html'
+          p.write_text(p.read_text().replace('/icon-192.png','/icon-192-v2.png'))
+
+          with zipfile.ZipFile('qfsv-netlify-v2.zip','w',zipfile.ZIP_DEFLATED) as z:
+           for p in sorted(out.rglob('*')):
+            if p.is_file():
+             z.write(p,'netlify-app/'+p.relative_to(out).as_posix())
+           z.writestr('LAS-MIG.txt','Packa upp och dra hela mappen netlify-app till Netlify > qfsv > Deploys. Genomskinliga ikoner, adminavbokning, helskarm under Boka och rattad splash ingar. Installera om en redan installerad app om den gamla ikonen finns kvar.')
+          PYICONS
+
+      - name: Kontrollera JavaScript och ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find deployment/netlify-app-v2 -name '*.js' -print0)
+          python3 -m zipfile -t qfsv-netlify-v2.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-netlify-v2
+          path: qfsv-netlify-v2.zip
+          if-no-files-found: error
+
+      - name: Spara i GitHub
+        run: |
+          git switch -c "netlify-ikoner-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/netlify-app-v2 qfsv-netlify-v2.zip
+          git commit -m "Version 2 med genomskinliga ikoner och rattad start"
+          git push origin HEAD
