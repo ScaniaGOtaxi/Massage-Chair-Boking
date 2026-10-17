@@ -1,0 +1,85 @@
+name: Netlify komplett version 2
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 437e1957f96881f1fe618e9c364e7263695ab432
+      - name: Bygg komplett paket
+        shell: bash
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          out=Path('deployment/netlify-app-v2')
+          p=out/'index.html';s=p.read_text();assert 'qfsv-splash-seen-v1' not in s
+          marker='<meta charset="UTF-8" />';assert s.count(marker)==1
+          bootstrap='''
+          <style>html.qfsv-splash-skip #qfsv-splash{display:none!important}</style>
+          <script>
+          (()=>{
+           let show=true;
+           try{
+            show=sessionStorage.getItem('qfsv-splash-seen-v1')!=='yes';
+            sessionStorage.setItem('qfsv-splash-seen-v1','yes');
+           }catch{
+            show=performance.getEntriesByType('navigation')[0]?.type!=='reload';
+           }
+           if(!show)document.documentElement.classList.add('qfsv-splash-skip');
+          })();
+          </script>
+          '''
+          s=s.replace(marker,marker+bootstrap);p.write_text(s)
+          p=next(out.glob('qfsv-splash-v4*.js'));s=p.read_text()
+          marker=' if(!splash||!root)return;';assert s.count(marker)==1
+          s=s.replace(marker,marker+"\n if(document.documentElement.classList.contains('qfsv-splash-skip')){splash.remove();return;}")
+          p.write_text(s)
+          changed=0
+          for p in (out/'assets').glob('index-D0UV-BkB*.js'):
+           s=p.read_text()
+           old='className:"qfsv-login-brand",children:[e.jsx("img",{src:"/massage-chair-v2.png"'
+           new='className:"qfsv-login-brand",children:[e.jsx("img",{src:"/massage-splash.png"'
+           changed+=s.count(old)
+           p.write_text(s.replace(old,new))
+          assert changed==1, 'Inloggningsbilden kunde inte hittas'
+          files=list(out.rglob('*.js'));names={p.name:p.stem+'.startlogin2.js'for p in files if p.name!='sw.js'}
+          for p in out.rglob('*'):
+           if p.is_file()and p.suffix in ['.js','.html']:
+            s=p.read_text()
+            for old,new in names.items():s=s.replace(old,new)
+            p.write_text(s)
+          for p in files:
+           if p.name in names:p.rename(p.with_name(names[p.name]))
+          import zipfile
+          assert (out/'massage-splash.png').is_file()
+          with zipfile.ZipFile('qfsv-netlify-v2.zip','w',zipfile.ZIP_DEFLATED) as z:
+           for p in sorted(out.rglob('*')):
+            if p.is_file(): z.write(p,'netlify-app/'+str(p.relative_to(out)))
+           z.writestr('LAS-MIG.txt','Packa upp ZIP-filen. Ladda upp hela mappen netlify-app till Netlify > qfsv > Deploys. Admin > Kommande bokningar har Avboka. Helskarm finns under Boka. Splash visas en gang per fliksession och hoppas over vid omladdning. Inloggningsbilden ar samma som i splash.')
+          print('Komplett paket skapat: qfsv-netlify-v2.zip')
+          PYBUILD
+      - name: Kontrollera JavaScript och ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find deployment/netlify-app-v2 -name '*.js' -print0)
+          python3 -m zipfile -t qfsv-netlify-v2.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-netlify-v2
+          path: qfsv-netlify-v2.zip
+          if-no-files-found: error
+      - name: Spara i GitHub
+        run: |
+          git switch -c "netlify-komplett-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/netlify-app-v2 qfsv-netlify-v2.zip
+          git commit -m "Komplett version 2 med rattad splash och inloggningsbild"
+          git push origin HEAD
