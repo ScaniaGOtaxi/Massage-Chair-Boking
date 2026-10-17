@@ -1,1 +1,0 @@
-import{a as e}from"./react-vendor-CZ0cz5LI.timefix1.features2.today1.allstats1.plus1.weekday1.version2.optional1.screen1.js";var o=function(){throw new Error("ws does not work in the browser. Browser clients must use the native WebSocket object")};const r=e(o),s=Object.freeze(Object.defineProperty({__proto__:null,default:r},Symbol.toStringTag,{value:"Module"}));export{s as b};
