@@ -104,3 +104,11 @@
 .qfsv-screen-card .qfsv-screen-note,.qfsv-screen-card p[role=alert]{flex-basis:100%}
 .qfsv-screen-card p[role=alert]{color:#b91c1c}
 :fullscreen{background:#f8fafc}
+
+.qfsv-booking-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.qfsv-screen-compact{max-width:100%}
+.qfsv-screen-compact button{background:white;color:#2563eb;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px;font-size:14px}
+.qfsv-screen-compact button[aria-pressed=true]{background:#2563eb;color:white}
+.qfsv-screen-compact button:disabled{opacity:.55}
+.qfsv-screen-compact button:focus-visible{outline:2px solid #2563eb;outline-offset:3px}
+.qfsv-screen-compact p[role=alert]{color:#b91c1c;font-size:13px;max-width:440px}

@@ -32,3 +32,6 @@ button.qfsv-danger{color:#bf2432;border-color:#f1c9ce}button.qfsv-danger:hover{b
 @keyframes qfsv-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){#qfsv-splash .qfsv-loader{animation:none}}
 @media(max-width:600px){.qfsv-panel{padding:16px}.qfsv-stat-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.qfsv-stat-columns{grid-template-columns:1fr}.qfsv-toolbar{align-items:start;flex-direction:column}.qfsv-booking{padding:14px;flex-wrap:wrap}.qfsv-filters label{flex:1;min-width:130px}.qfsv-tabs button{flex:1;padding:10px 8px}.qfsv-logout button{white-space:nowrap}}
+
+.qfsv-admin-search{display:grid;gap:7px;color:#475569;font-size:14px;margin:16px 0}
+.qfsv-admin-search input{width:100%;max-width:480px;border:1px solid #dbe5f3;border-radius:10px;padding:11px;background:white;color:#17304e}
