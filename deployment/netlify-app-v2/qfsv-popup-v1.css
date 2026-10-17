@@ -1,0 +1,22 @@
+
+.qfsv-popup,dialog.qfsv-install-dialog{box-sizing:border-box;position:fixed;inset:0;margin:auto;width:min(460px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid #dce6f5;border-radius:22px;padding:28px;background:#fff;color:#123457;box-shadow:0 24px 80px #12345733;font-family:inherit;color-scheme:light}
+.qfsv-popup::backdrop,dialog::backdrop{background:#10244080;backdrop-filter:blur(3px)}
+.qfsv-popup-icon{display:grid;place-items:center;width:52px;height:52px;border-radius:50%;margin:0 auto 16px;background:#eff6ff;color:#2563eb;font-size:27px;font-weight:700}
+.qfsv-popup h2{font-size:24px;line-height:1.3;text-align:center;margin:0 0 14px;font-weight:700;color:#123457}
+.qfsv-popup p{font-size:16px;line-height:1.65;text-align:center;white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 24px;color:#526b88}
+.qfsv-popup-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.qfsv-popup button,.qfsv-modal-overlay button{font-family:inherit;font-size:15px;cursor:pointer;border-radius:12px;min-height:46px;padding:11px 20px;font-weight:600;transition:background .15s}
+.qfsv-popup-primary{background:#2563eb;color:#fff;border:1px solid #2563eb;min-width:100px}
+.qfsv-popup-primary:hover{background:#1d4ed8}
+.qfsv-popup-secondary{background:#fff;color:#2457a6;border:1px solid #cbdcf6}
+.qfsv-popup-secondary:hover{background:#eff6ff}
+.qfsv-popup[data-kind=danger] .qfsv-popup-icon,.qfsv-popup[data-kind=error] .qfsv-popup-icon{background:#fff1f2;color:#dc2626}
+.qfsv-popup[data-kind=danger] .qfsv-popup-primary{background:#dc2626;border-color:#dc2626}
+.qfsv-popup[data-kind=danger] .qfsv-popup-primary:hover{background:#b91c1c}
+.qfsv-popup[data-kind=success] .qfsv-popup-icon{background:#ecfdf5;color:#047857}
+.qfsv-popup button:focus-visible,.qfsv-modal-overlay button:focus-visible{outline:3px solid #93c5fd;outline-offset:3px}
+.qfsv-modal-overlay{position:fixed!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:16px!important;background:#10244080!important;backdrop-filter:blur(3px);z-index:1000!important}
+.qfsv-modal-overlay>div{background:white!important;color:#123457!important;border:1px solid #dce6f5!important;border-radius:22px!important;box-shadow:0 24px 80px #12345733;max-height:calc(100dvh - 32px);overflow:auto;padding:26px!important}
+dialog[id^=qfsv]{position:fixed;inset:0;margin:auto;border-radius:22px;background:#fff;color:#123457;border:1px solid #dce6f5;max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);overflow:auto;color-scheme:light}
+dialog[id^=qfsv] button{border-radius:12px;min-height:44px;font-family:inherit}
+@media(max-width:480px){.qfsv-popup{padding:24px 20px}.qfsv-popup-actions{flex-direction:column}.qfsv-popup button{width:100%}}
