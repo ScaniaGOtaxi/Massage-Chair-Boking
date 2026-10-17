@@ -1,0 +1,159 @@
+name: Netlify med centrerade popup
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  paket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: e86dc1791b1badc594719ced08435aa672658567
+
+      - name: Skapa popup och paket
+        run: |
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          import re,zipfile
+          out=Path("deployment/netlify-app-v2")
+
+          (out/'qfsv-popup-v1.js').write_text('''(()=>{
+           const queue=[];let busy=false;
+           const translations={
+            'Booking cancelled successfully':'Bokningen är avbokad. Tiden är tillgänglig igen.',
+            'Booking updated successfully':'Bokningen har uppdaterats.',
+            'Failed to cancel booking. Please try again.':'Bokningen kunde inte avbokas. Försök igen.',
+            'Failed to update booking. Please try again.':'Bokningen kunde inte uppdateras. Försök igen.',
+            'You can only delete your own bookings':'Du kan bara avboka dina egna bokningar.',
+            'User data not available':'Dina användaruppgifter kunde inte hämtas. Logga in igen.',
+            'Failed to fetch users':'Användarna kunde inte hämtas. Försök igen.',
+            'This time slot has just been booked by someone else. Please choose another time.':'Tiden har just bokats av någon annan. Välj en annan tid.'
+           };
+           function message(value){
+            let s=String(value??'');s=translations[s]||s;
+            return s.replace('Booking successful!','Bokningen är bekräftad!').replace('Time:','Tid:').replace('Duration:','Längd:').replace('minutes','minuter');
+           }
+           function show(){
+            if(busy||!queue.length)return;
+            busy=true;
+            const task=queue.shift(),previous=document.activeElement;
+            const text=message(task.text),danger=task.confirm;
+            const error=!danger&&/failed|error|kunde inte|kan bara|misslyck|fel|not available|inte tillåtet|ogiltig|saknas|utgången/i.test(text);
+            const success=!danger&&!error&&/bekräftad|uppdaterats|avbokad|successful|sparad/i.test(text);
+            const kind=danger?'danger':error?'error':success?'success':'info';
+            const title=danger?'Bekräfta avbokning':error?'Något gick fel':success?'Klart!':'Information';
+            const dialog=document.createElement('dialog');dialog.className='qfsv-popup';dialog.dataset.kind=kind;
+            dialog.setAttribute('aria-labelledby','qfsv-popup-title');dialog.setAttribute('aria-describedby','qfsv-popup-text');
+            const icon=document.createElement('div');icon.className='qfsv-popup-icon';icon.setAttribute('aria-hidden','true');icon.textContent=danger?'?':error?'!':success?'✓':'i';
+            const heading=document.createElement('h2');heading.id='qfsv-popup-title';heading.textContent=title;
+            const body=document.createElement('p');body.id='qfsv-popup-text';body.textContent=text;
+            const actions=document.createElement('div');actions.className='qfsv-popup-actions';
+            let finished=false;
+            function finish(result){
+             if(finished)return;finished=true;
+             dialog.remove();busy=false;
+             if(previous?.isConnected)previous.focus({preventScroll:true});
+             task.resolve(result);setTimeout(show,0);
+            }
+            if(danger){
+             const cancel=document.createElement('button');cancel.type='button';cancel.className='qfsv-popup-secondary';cancel.textContent='Behåll bokningen';cancel.autofocus=true;
+             cancel.onclick=()=>finish(false);actions.append(cancel);
+            }
+            const ok=document.createElement('button');ok.type='button';ok.className='qfsv-popup-primary';ok.textContent=danger?'Ja, avboka':'OK';ok.autofocus=!danger;ok.onclick=()=>finish(true);actions.append(ok);
+            dialog.append(icon,heading,body,actions);document.body.append(dialog);
+            dialog.addEventListener('cancel',event=>{event.preventDefault();finish(false)});
+            dialog.addEventListener('close',()=>finish(false));
+            dialog.showModal();(danger?actions.firstElementChild:ok).focus();
+           }
+           const open=(text,confirm)=>new Promise(resolve=>{queue.push({text,confirm,resolve});show()});
+           window.QFSVPopup={alert:text=>open(text,false),confirm:text=>open(text,true)};
+          })();
+          ''')
+
+          (out/'qfsv-popup-v1.css').write_text('''
+          .qfsv-popup,dialog.qfsv-install-dialog{box-sizing:border-box;position:fixed;inset:0;margin:auto;width:min(460px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid #dce6f5;border-radius:22px;padding:28px;background:#fff;color:#123457;box-shadow:0 24px 80px #12345733;font-family:inherit;color-scheme:light}
+          .qfsv-popup::backdrop,dialog::backdrop{background:#10244080;backdrop-filter:blur(3px)}
+          .qfsv-popup-icon{display:grid;place-items:center;width:52px;height:52px;border-radius:50%;margin:0 auto 16px;background:#eff6ff;color:#2563eb;font-size:27px;font-weight:700}
+          .qfsv-popup h2{font-size:24px;line-height:1.3;text-align:center;margin:0 0 14px;font-weight:700;color:#123457}
+          .qfsv-popup p{font-size:16px;line-height:1.65;text-align:center;white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 24px;color:#526b88}
+          .qfsv-popup-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+          .qfsv-popup button,.qfsv-modal-overlay button{font-family:inherit;font-size:15px;cursor:pointer;border-radius:12px;min-height:46px;padding:11px 20px;font-weight:600;transition:background .15s}
+          .qfsv-popup-primary{background:#2563eb;color:#fff;border:1px solid #2563eb;min-width:100px}
+          .qfsv-popup-primary:hover{background:#1d4ed8}
+          .qfsv-popup-secondary{background:#fff;color:#2457a6;border:1px solid #cbdcf6}
+          .qfsv-popup-secondary:hover{background:#eff6ff}
+          .qfsv-popup[data-kind=danger] .qfsv-popup-icon,.qfsv-popup[data-kind=error] .qfsv-popup-icon{background:#fff1f2;color:#dc2626}
+          .qfsv-popup[data-kind=danger] .qfsv-popup-primary{background:#dc2626;border-color:#dc2626}
+          .qfsv-popup[data-kind=danger] .qfsv-popup-primary:hover{background:#b91c1c}
+          .qfsv-popup[data-kind=success] .qfsv-popup-icon{background:#ecfdf5;color:#047857}
+          .qfsv-popup button:focus-visible,.qfsv-modal-overlay button:focus-visible{outline:3px solid #93c5fd;outline-offset:3px}
+          .qfsv-modal-overlay{position:fixed!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:16px!important;background:#10244080!important;backdrop-filter:blur(3px);z-index:1000!important}
+          .qfsv-modal-overlay>div{background:white!important;color:#123457!important;border:1px solid #dce6f5!important;border-radius:22px!important;box-shadow:0 24px 80px #12345733;max-height:calc(100dvh - 32px);overflow:auto;padding:26px!important}
+          dialog[id^=qfsv]{position:fixed;inset:0;margin:auto;border-radius:22px;background:#fff;color:#123457;border:1px solid #dce6f5;max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);overflow:auto;color-scheme:light}
+          dialog[id^=qfsv] button{border-radius:12px;min-height:44px;font-family:inherit}
+          @media(max-width:480px){.qfsv-popup{padding:24px 20px}.qfsv-popup-actions{flex-direction:column}.qfsv-popup button{width:100%}}
+          ''')
+
+          confirm_count=0
+          for p in out.rglob('*.js'):
+           s=p.read_text()
+           if p.name.startswith(('qfsv-admin-upcoming','qfsv-features-v2')):
+            confirm_count+=s.count('if(!window.confirm(')
+            s=s.replace('if(!window.confirm(', 'if(!await window.QFSVPopup.confirm(')
+            s=s.replace("if(lock.current)return;\n  if(!await", "if(lock.current)return;\n  lock.current=true;\n  if(!await")
+            s=s.replace('))return;\n  lock.current=true;', ')){lock.current=false;return;}\n  lock.current=true;')
+           if p.name.startswith(('AdminPanel-','BookingsAndStats-','UserSettings-','index-D0UV-')):
+            s=re.sub(r'(?<![\w$.])alert\(', 'window.QFSVPopup.alert(',s)
+           s=s.replace('fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50','qfsv-modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50')
+           p.write_text(s)
+          assert confirm_count==2
+
+          p=out/'index.html'
+          s=p.read_text()
+          assert s.count('</head>')==1
+          s=s.replace('</head>','<link rel="stylesheet" href="/qfsv-popup-v1.css"><script src="/qfsv-popup-v1.js"></script></head>')
+          p.write_text(s)
+
+          files=list(out.rglob('*.js'))
+          names={p.name:p.stem+'.popup1.js' for p in files if p.name!='sw.js'}
+          for p in out.rglob('*'):
+           if p.is_file() and p.suffix in ['.js','.html']:
+            s=p.read_text()
+            for old,new in names.items():
+             s=s.replace(old,new)
+            p.write_text(s)
+          for p in files:
+           if p.name in names:
+            p.rename(p.with_name(names[p.name]))
+
+          with zipfile.ZipFile('qfsv-netlify-popup.zip','w',zipfile.ZIP_DEFLATED) as z:
+           for p in sorted(out.rglob('*')):
+            if p.is_file():
+             z.write(p,'netlify-app/'+p.relative_to(out).as_posix())
+           z.writestr('LAS-MIG.txt','Packa upp och dra hela mappen netlify-app till Netlify > qfsv > Deploys. Centrerade appdialoger med matchande farger och knappar. Hjalp, tidigare funktioner och ikoner ingar. Webblasarens egna installations- och behorighetsrutor styrs av webblasaren.')
+          PYBUILD
+
+      - name: Kontrollera paket
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find deployment/netlify-app-v2 -name '*.js' -print0)
+          python3 -m zipfile -t qfsv-netlify-popup.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qfsv-netlify-popup
+          path: qfsv-netlify-popup.zip
+          if-no-files-found: error
+
+      - name: Spara i GitHub
+        run: |
+          git switch -c "netlify-popup-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/netlify-app-v2 qfsv-netlify-popup.zip
+          git commit -m "Centrerade popup med appens farger"
+          git push origin HEAD
